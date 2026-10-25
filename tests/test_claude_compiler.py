@@ -104,3 +104,25 @@ def test_api_compile_endpoint_selects_compiler(monkeypatch):
         assert r.status_code == 201 and len(r.json()["entities"]) == 2
         http.delete(f"/simulations/{r.json()['simulation_id']}")
         assert http.post("/compile", json={"prompt": "x", "compiler": "gpt"}).status_code == 422
+
+
+def test_chaos_spec_becomes_an_anomaly():
+    from vibesim.core.claude_compiler import _AnomalySpec, compile_chaos_with_claude
+
+    spec = {
+        "name": "brownout",
+        "targets": [],
+        "set": [{"name": "cpu_pct", "value": 95}],
+        "ramp_ticks": 5,
+        "drop_rate": 0.2,
+        "delay_ticks": 0,
+        "jitter_ticks": 2,
+        "duration_ticks": None,
+    }
+    client = FakeClient(None)
+    client.beta.messages.parse = client._parse(
+        SimpleNamespace(parsed_output=_AnomalySpec.model_validate(spec), stop_reason="end_turn")
+    )
+    anomaly = compile_chaos_with_claude("a brownout", {"svc-01": {"cpu_pct": 30}}, 1000, client=client)
+    assert anomaly.targets is None and anomaly.set == {"cpu_pct": 95} and anomaly.ramp_ticks == 5
+    assert "svc-01: {'cpu_pct': 30}" in client.calls[0]["messages"][0]["content"]

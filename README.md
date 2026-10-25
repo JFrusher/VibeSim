@@ -19,7 +19,11 @@ curl -N localhost:8000/simulations/<id>/stream
 
 # break something
 curl -s -XPOST localhost:8000/simulations/<id>/chaos -H 'content-type: application/json' \
-  -d '{"name": "dead-battery", "entity_id": "van-01", "set": {"battery_pct": 0}}'
+  -d '{"name": "dead-battery", "targets": ["van-01"], "set": {"battery_pct": 0}}'
+
+# ...or in plain English
+curl -s -XPOST localhost:8000/simulations/<id>/chaos/prompt -H 'content-type: application/json' \
+  -d '{"prompt": "sudden network drop on half the vans for 30 seconds"}'
 ```
 
 You can also POST a full `SimulationConfig` as `{"config": {...}}` instead of a prompt.
@@ -43,11 +47,39 @@ A prompt is compiled once, when the simulation is created. Pick the compiler per
 | POST | `/simulations/{id}/start\|pause\|step\|stop` | clock control |
 | DELETE | `/simulations/{id}` | stop and forget |
 | POST | `/simulations/{id}/chaos` | inject an `Anomaly` |
+| POST | `/simulations/{id}/chaos/prompt` | plain-English chaos |
 | DELETE | `/simulations/{id}/chaos/{name}` | remove it |
 | GET | `/simulations/{id}/stream` | SSE telemetry |
 | WS | `/simulations/{id}/ws` | telemetry out, `Anomaly` JSON in |
 
-An `Anomaly` is `{"name", "entity_id"?, "set"?: {field: value}, "drop_rate"?: 0..1, "duration_ticks"?}`. `set` forces state fields every tick it is active; `drop_rate` suppresses that fraction of events (packet loss). Omit `entity_id` to hit every entity.
+## Chaos
+
+An `Anomaly` has a `name` plus any of the following:
+
+| Field | Effect |
+|---|---|
+| `targets` | entity ids to hit (omit for all) |
+| `set` | state fields forced every tick while active |
+| `ramp_ticks` | numeric `set` values move to their target gradually instead of jumping |
+| `drop_rate` | share of events lost, 0–1 |
+| `delay_ticks`, `jitter_ticks` | events arrive late, and with jitter out of order |
+| `duration_ticks` | ends automatically; omit to last until removed |
+
+Plain-English chaos (`POST /simulations/{id}/chaos/prompt`, `{"prompt", "compiler"?}`) understands outages, packet loss (`30%`), latency and jitter, `cpu to 100`, `status to delayed`, shortcuts like "dead battery", "memory leak", "out of stock", targets like "half the vans" or `van-02`, and "for 30 seconds" / "over 2 minutes". `"compiler": "claude"` handles anything else.
+
+Scenario configs can script incidents in `chaos_rules`:
+
+```json
+"chaos_rules": {
+  "timeline": [
+    {"at_tick": 100, "inject": {"name": "storm", "set": {"status": "delayed"}}},
+    {"at_tick": 200, "remove": "storm"}
+  ],
+  "random": {"per_minute": 2, "catalogue": [{"name": "blip", "drop_rate": 1, "duration_ticks": 5}]}
+}
+```
+
+Random incidents use their own seeded stream: the same `seed` replays the same incidents, and injecting chaos never changes the underlying trajectory.
 
 ## Describing a world
 

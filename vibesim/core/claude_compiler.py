@@ -4,11 +4,13 @@ Claude fills a list-based schema (structured outputs need closed objects), which
 to a SimulationConfig and checked by building an Engine. Any failure raises ValueError.
 """
 
-from typing import Any, Literal
+from typing import Any, Literal, TypeVar
 
 from pydantic import BaseModel
 
-from vibesim.core.state import EntityConfig, SimulationConfig
+from vibesim.core.state import Anomaly, EntityConfig, SimulationConfig
+
+T = TypeVar("T", bound=BaseModel)
 
 MODEL = "claude-opus-5-5"
 
@@ -83,7 +85,53 @@ class _Spec(BaseModel):
     entities: list[_Entity]
 
 
+CHAOS_SYSTEM = """You inject failures into a running VibeSim simulation so developers can test how their app
+copes. Turn the user's description into one anomaly:
+- name: short kebab-case
+- targets: entity ids to hit; empty list means every entity
+- set: state fields to force while active (only fields that exist; numbers stay in sensible bounds)
+- ramp_ticks: move numeric `set` values gradually over this many ticks, or null to jump at once
+- drop_rate: 0..1 share of events lost (packet loss, outages)
+- delay_ticks / jitter_ticks: emit events late, plus random extra lateness (latency, out-of-order)
+- duration_ticks: how long it lasts, or null until removed
+Leave effects you don't need at 0 / empty / null."""
+
+
+class _AnomalySpec(BaseModel):
+    name: str
+    targets: list[str]
+    set: list[_Value]
+    ramp_ticks: int | None = None
+    drop_rate: float
+    delay_ticks: int
+    jitter_ticks: int
+    duration_ticks: int | None = None
+
+
 def compile_with_claude(prompt: str, seed: int = 0, client: Any = None) -> SimulationConfig:
+    return _to_config(_ask(SYSTEM, prompt, _Spec, client), seed)
+
+
+def compile_chaos_with_claude(
+    prompt: str, entities: dict[str, dict[str, Any]], tick_interval_ms: int, client: Any = None
+) -> Anomaly:
+    context = f"Tick length: {tick_interval_ms} ms. Entities and their current state:\n" + "\n".join(
+        f"- {eid}: {state}" for eid, state in entities.items()
+    )
+    spec = _ask(CHAOS_SYSTEM, f"{context}\n\nFailure to inject: {prompt}", _AnomalySpec, client)
+    return Anomaly(
+        name=spec.name,
+        targets=spec.targets or None,
+        set={v.name: v.value for v in spec.set},
+        ramp_ticks=spec.ramp_ticks,
+        drop_rate=spec.drop_rate,
+        delay_ticks=spec.delay_ticks,
+        jitter_ticks=spec.jitter_ticks,
+        duration_ticks=spec.duration_ticks,
+    )
+
+
+def _ask(system: str, prompt: str, output_format: type[T], client: Any) -> T:
     import anthropic  # optional dependency: pip install "vibesim[claude]"
 
     client = client or anthropic.Anthropic()
@@ -95,17 +143,18 @@ def compile_with_claude(prompt: str, seed: int = 0, client: Any = None) -> Simul
             # on a safety decline, retry on a fallback model chosen by the API
             betas=["server-side-fallback-2026-07-01"],
             fallbacks="default",
-            system=SYSTEM,
+            system=system,
             messages=[{"role": "user", "content": prompt}],
-            output_format=_Spec,
+            output_format=output_format,
         )
     except anthropic.AuthenticationError as e:
         raise ValueError("Claude compiler needs credentials: set ANTHROPIC_API_KEY") from e
     except anthropic.APIError as e:
         raise ValueError(f"Claude compiler request failed: {e}") from e
     if response.stop_reason in ("refusal", "max_tokens") or response.parsed_output is None:
-        raise ValueError(f"Claude did not produce a simulation (stop_reason={response.stop_reason})")
-    return _to_config(response.parsed_output, seed)
+        raise ValueError(f"Claude did not produce a result (stop_reason={response.stop_reason})")
+    parsed: T = response.parsed_output
+    return parsed
 
 
 def _to_config(spec: _Spec, seed: int) -> SimulationConfig:

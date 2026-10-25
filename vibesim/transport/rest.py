@@ -6,6 +6,7 @@ from typing import Any, Literal, Self
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, model_validator
 
+from vibesim.chaos.compiler import compile_chaos_with
 from vibesim.core.compiler import Compiler, compile_with
 from vibesim.core.engine import Engine, simulations
 from vibesim.core.state import Anomaly, SimulationConfig
@@ -20,6 +21,11 @@ class CompileRequest(BaseModel):
     prompt: str
     compiler: Compiler = "keyword"
     seed: int = 0
+
+
+class ChaosPrompt(BaseModel):
+    prompt: str
+    compiler: Compiler = "keyword"
 
 
 class CreateSimulation(BaseModel):
@@ -90,6 +96,23 @@ async def inject_chaos(anomaly: Anomaly, engine: EngineDep) -> dict[str, Any]:
     except ValueError as e:
         raise HTTPException(409, str(e)) from e
     return describe(engine)
+
+
+@app.post("/simulations/{simulation_id}/chaos/prompt", status_code=201)
+async def inject_chaos_prompt(body: ChaosPrompt, engine: EngineDep) -> dict[str, Any]:
+    """Compile a plain-English failure into an anomaly and inject it."""
+    try:
+        anomaly = await asyncio.to_thread(
+            compile_chaos_with,
+            body.compiler,
+            body.prompt,
+            engine.state.snapshot()["entities"],
+            engine.config.tick_interval_ms,
+        )
+        engine.inject(anomaly)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+    return {**describe(engine), "injected": anomaly.model_dump()}
 
 
 @app.delete("/simulations/{simulation_id}/chaos/{name}")

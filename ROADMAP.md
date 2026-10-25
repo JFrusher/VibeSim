@@ -47,7 +47,7 @@ The core of "simulate anything".
 
 **Done when:** the same prompt works through either compiler and produces a valid, runnable config.
 
-## Phase 5: Chaos v2
+## Phase 5: Chaos v2 ✅
 All chaos features are opt-in in the scenario's `chaos` block.
 - **Natural-language chaos:** `"sudden network drop on half the vans"` becomes an `Anomaly`, using the same compiler choice as above.
 - **Scheduled timelines:** `at: 100 → inject X; at: 200 → remove X`, for story-driven runs.

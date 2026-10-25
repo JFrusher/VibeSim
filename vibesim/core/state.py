@@ -85,15 +85,55 @@ class EntityConfig(BaseModel):
 
 
 class Anomaly(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
-    entity_id: str | None = None  # None targets every entity
+    targets: list[str] | None = None  # entity ids; None hits every entity
     set: dict[str, Any] = {}  # state fields forced while the anomaly is active
+    ramp_ticks: int | None = Field(None, ge=1)  # numeric `set` values move to their target over this many ticks
     drop_rate: float = Field(0.0, ge=0.0, le=1.0)  # fraction of events not emitted
+    delay_ticks: int = Field(0, ge=0)  # events are emitted this many ticks late
+    jitter_ticks: int = Field(0, ge=0)  # plus a random 0..jitter extra, so they can arrive out of order
     duration_ticks: int | None = Field(None, ge=1)  # None lasts until removed
 
 
+class TimelineStep(BaseModel):
+    """At `at_tick`, inject an anomaly or remove one by name."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    at_tick: int = Field(ge=1)
+    inject: Anomaly | None = None
+    remove: str | None = None
+
+    @model_validator(mode="after")
+    def one_action(self) -> Self:
+        if (self.inject is None) == (self.remove is None):
+            raise ValueError("timeline step needs exactly one of 'inject' or 'remove'")
+        return self
+
+
+class RandomChaos(BaseModel):
+    """Inject a random catalogue entry `per_minute` times per simulated minute on average."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    per_minute: float = Field(gt=0.0)
+    catalogue: list[Anomaly] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def incidents_end(self) -> Self:
+        if any(a.duration_ticks is None for a in self.catalogue):
+            raise ValueError("random chaos catalogue entries need 'duration_ticks'")
+        return self
+
+
 class ChaosRules(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     active_anomalies: list[Anomaly] = []
+    timeline: list[TimelineStep] = []
+    random: RandomChaos | None = None
 
 
 class SimulationConfig(BaseModel):

@@ -24,7 +24,7 @@ def test_create_control_chaos_and_websocket():
         with client.websocket_connect(f"/simulations/{sid}/ws") as ws:
             event = json.loads(ws.receive_text())
             assert event["event_type"] == "telemetry_update"
-            ws.send_text(json.dumps({"name": "flat", "entity_id": event["entity_id"], "set": {"cpu_pct": 0}}))
+            ws.send_text(json.dumps({"name": "flat", "targets": [event["entity_id"]], "set": {"cpu_pct": 0}}))
             for _ in range(10):
                 event = json.loads(ws.receive_text())
                 if event["event_type"] == "telemetry_update" and event["anomalies_applied"] == ["flat"]:

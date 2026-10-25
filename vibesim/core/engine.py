@@ -30,25 +30,26 @@ class Engine:
                     raise ValueError(f"duplicate entity id '{entity_id}'")
                 self.runtimes[entity_id] = runtime
         self.state = SimulationState({eid: rt.initial_state() for eid, rt in self.runtimes.items()})
-        self.chaos = ChaosInjector(config.chaos_rules.active_anomalies)
+        self.chaos = ChaosInjector(config.chaos_rules, self.runtimes)
         self.rng = random.Random(config.seed)
         # separate stream so injecting chaos doesn't shift the base trajectory
         self.chaos_rng = random.Random(config.seed + 1)
         self.status: Status = "paused"
         self._task: asyncio.Task[None] | None = None
         self._subscribers: set[Subscriber] = set()
+        self._delayed: list[tuple[int, TelemetryEvent]] = []  # (release tick, event) held back by chaos
 
     def step(self) -> list[TelemetryEvent]:
         if self.status in ("stopped", "failed"):
             raise RuntimeError(f"simulation is {self.status}")
         tick = self.state.tick + 1
-        self.chaos.expire(tick)
         dt_s = self.config.tick_interval_ms / 1000
-        events = []
+        self.chaos.begin_tick(tick, dt_s, self.chaos_rng)
+        events: list[TelemetryEvent] = []
         for entity_id, state in self.state.entities.items():
             runtime = self.runtimes[entity_id]
             anomalies = self.chaos.for_entity(entity_id)
-            overrides = {k: v for a in anomalies for k, v in a.set.items()}
+            overrides = self.chaos.overrides(entity_id, state, tick)
             previous_status = state.get("status")
             state.update(overrides)  # tick reacts to forced values
             runtime.clamp(state)
@@ -57,8 +58,9 @@ class Engine:
             runtime.clamp(state)
             if ChaosInjector.should_drop(anomalies, self.chaos_rng):
                 continue
+            entity_events = []
             if state.get("status") != previous_status:
-                events.append(
+                entity_events.append(
                     TelemetryEvent(
                         timestamp=utcnow(),
                         tick=tick,
@@ -68,7 +70,7 @@ class Engine:
                         anomalies_applied=[a.name for a in anomalies],
                     )
                 )
-            events.append(
+            entity_events.append(
                 TelemetryEvent(
                     timestamp=utcnow(),
                     tick=tick,
@@ -77,6 +79,12 @@ class Engine:
                     anomalies_applied=[a.name for a in anomalies],
                 )
             )
+            if delay := ChaosInjector.delay(anomalies, self.chaos_rng):
+                self._delayed.extend((tick + delay, e) for e in entity_events)
+            else:
+                events.extend(entity_events)
+        events.extend(e for release, e in self._delayed if release <= tick)
+        self._delayed = [(release, e) for release, e in self._delayed if release > tick]
         self.state.tick = tick
         for event in events:
             self._publish(event)

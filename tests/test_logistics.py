@@ -70,7 +70,7 @@ def test_traffic_delays_slow_the_van():
 def test_chaos_override_reflected_immediately():
     engine = fleet(delivery_van("van-01", WINCHESTER), delivery_van("van-02", WINCHESTER))
     engine.step()
-    engine.inject(Anomaly(name="dead-battery", entity_id="van-01", set={"battery_pct": 0}))
+    engine.inject(Anomaly(name="dead-battery", targets=["van-01"], set={"battery_pct": 0}))
     events = {(e.entity_id, e.event_type): e for e in engine.step()}
     van1 = events[("van-01", "telemetry_update")]
     assert van1.data["battery_pct"] == 0.0
