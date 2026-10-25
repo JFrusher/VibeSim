@@ -4,10 +4,10 @@ import pytest
 
 from vibesim.core.engine import Engine
 from vibesim.core.state import Anomaly, SimulationConfig
-from vibesim.domains.logistics import ROUTES, VehiclePlugin, delivery_van
+from vibesim.domains.logistics import VehiclePlugin, delivery_van
 
-WINCHESTER = ROUTES["southampton_to_winchester"]
-PORTSMOUTH = ROUTES["southampton_to_portsmouth"]
+WINCHESTER = [(50.9097, -1.4043), (51.0632, -1.3080)]
+PORTSMOUTH = [(50.9097, -1.4043), (50.8198, -1.0880)]
 
 
 def fleet(*vans) -> Engine:

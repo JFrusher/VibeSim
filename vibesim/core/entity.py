@@ -9,7 +9,7 @@ from vibesim.core.state import Cycle, Derived, Drift, EntityConfig, FieldSpec, M
 from vibesim.domains import PLUGINS
 from vibesim.domains.base import Plugin, clamp
 
-RESERVED_NAMES = {"t", "tick"}
+RESERVED_NAMES = {"t", "tick", "dt"}
 
 
 class EntityRuntime:
@@ -41,12 +41,14 @@ class EntityRuntime:
             self.plugin.tick(state, dt_s, rng)
         t = tick * dt_s
         for name, spec, expr, when in self.fields:
-            env = {**state, "t": t, "tick": tick}
+            env = {**state, "t": t, "tick": tick, "dt": dt_s}
             if when and not when(env):
                 continue
-            state[name] = _advance(spec, state[name], expr, env, t, dt_s, rng)
-        self.clamp(state)
-        env = {**state, "t": t, "tick": tick}
+            # bound each field immediately so later fields read physical values
+            state[name] = _bound(spec, _advance(spec, state[name], expr, env, t, dt_s, rng))
+        if self.plugin:
+            self.plugin.clamp(state)
+        env = {**state, "t": t, "tick": tick, "dt": dt_s}
         for transition, when in self.machine:
             if not _matches(transition.source, state["status"]):
                 continue
@@ -61,12 +63,7 @@ class EntityRuntime:
         if self.plugin:
             self.plugin.clamp(state)
         for name, spec, _, _ in self.fields:
-            value = clamp(
-                state[name],
-                spec.min if spec.min is not None else -math.inf,
-                spec.max if spec.max is not None else math.inf,
-            )
-            state[name] = round(value, spec.round) if spec.round is not None else value
+            state[name] = _bound(spec, state[name])
 
     def _validate_names(self) -> None:
         known = set(self.initial_state()) | set(self.config.fields) | RESERVED_NAMES
@@ -78,6 +75,12 @@ class EntityRuntime:
         for e in exprs:
             if unknown := e.names - known:
                 raise ValueError(f"entity '{self.config.id}': '{e.source}' uses unknown names {sorted(unknown)}")
+
+
+def _bound(spec: FieldSpec, value: float) -> float:
+    lo = spec.min if spec.min is not None else -math.inf
+    hi = spec.max if spec.max is not None else math.inf
+    return round(clamp(value, lo, hi), spec.round) if spec.round is not None else clamp(value, lo, hi)
 
 
 def _compile(source: str | None) -> Expr | None:

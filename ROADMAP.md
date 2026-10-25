@@ -30,12 +30,12 @@ The core of "simulate anything".
 
 **Done when:** a new domain can be written as YAML only, and devops runs with zero Python.
 
-## Phase 3: Domains v1
+## Phase 3: Domains v1 ✅
 - **Logistics + real roads:** the compiler geocodes the named places and fetches a road polyline from public OSRM, once, at creation, cached on disk. Vans follow the polyline at a speed driven by traffic. The runtime makes no network calls.
 - **IoT / smart building:** temperature, humidity, CO₂, occupancy driven by a day cycle, energy draw, HVAC state machine.
 - **E-commerce:** signups, carts, orders, payment success/failure, inventory depletion and restock, conversion rates on a time-of-day curve.
 - **Finance:** price ticks (geometric Brownian motion), a simple order book plug-in, trades, volume spikes.
-- **DevOps:** expanded with request rate, error rate, pod restarts and a dependency fan-out between services.
+- **DevOps:** expanded with request rate, error rate, pod restarts and a dependency fan-out between services. *(Fan-out deferred: entities can't yet read each other's state, so it needs a cross-entity expression design.)*
 
 **Done when:** each domain has a preset scenario and tests, and the logistics demo is realistic on a real map.
 
