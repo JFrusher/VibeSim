@@ -8,9 +8,9 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Any, Literal, Self
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 
@@ -149,6 +149,12 @@ async def advance(engine: EngineDep, ticks: Annotated[int, Query(ge=1, le=1_000_
     except RuntimeError as e:
         raise HTTPException(409, str(e)) from e
     return describe(engine)
+
+
+@app.get("/", include_in_schema=False)
+async def console(request: Request) -> RedirectResponse:
+    query = f"?{request.url.query}" if request.url.query else ""
+    return RedirectResponse(f"/client/console.html{query}")
 
 
 @app.get("/metrics")
