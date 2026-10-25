@@ -5,8 +5,8 @@ import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 
-from src.core.state import Anomaly
-from src.transport import get_engine
+from vibesim.core.state import Anomaly
+from vibesim.transport import get_engine
 
 router = APIRouter()
 
@@ -17,12 +17,12 @@ async def telemetry_socket(websocket: WebSocket, simulation_id: str) -> None:
     await websocket.accept()
     queue = engine.subscribe()
 
-    async def send_events():
+    async def send_events() -> None:
         while (event := await queue.get()) is not None:
             await websocket.send_text(event.model_dump_json())
         await websocket.close()
 
-    async def receive_chaos():
+    async def receive_chaos() -> None:
         # each inbound message is an Anomaly JSON object
         while True:
             raw = await websocket.receive_text()

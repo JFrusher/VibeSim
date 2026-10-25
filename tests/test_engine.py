@@ -2,17 +2,16 @@ import asyncio
 
 import pytest
 
-from src.core.engine import Engine
-from src.core.state import Anomaly, EntityConfig, SimulationConfig
+from vibesim.core.engine import Engine
+from vibesim.core.state import Anomaly, SimulationConfig
+from vibesim.domains.devops import microservice
 
 
 def devops_config(**kw) -> SimulationConfig:
     return SimulationConfig(
         domain="devops",
         tick_interval_ms=100,
-        entities=[EntityConfig(id="svc-01", type="microservice",
-                               initial_state={"cpu_pct": 35.0, "memory_pct": 40.0, "latency_ms": 40.0},
-                               behavior_rules={"memory_leak_rate": 1.0, "volatility": 0.0})],
+        entities=[microservice("svc-01", volatility=0.0, memory_leak_pct_per_s=10.0)],
         **kw,
     )
 
@@ -22,7 +21,7 @@ def test_step_increments_tick_and_applies_linear_delta():
     for expected_tick in range(1, 6):
         (event,) = engine.step()
         assert event.tick == expected_tick == engine.state.tick
-    assert engine.state.entities["svc-01"]["memory_pct"] == pytest.approx(45.0)
+    assert engine.state.entities["svc-01"]["memory_pct"] == pytest.approx(45.0)  # 10%/s * 0.1s * 5
 
 
 def test_same_seed_is_deterministic():
@@ -64,7 +63,7 @@ def test_slow_subscriber_is_bounded():
 def test_anomaly_expires_after_duration():
     engine = Engine(devops_config())
     engine.inject(Anomaly(name="cpu-spike", set={"cpu_pct": 150}, duration_ticks=2))
-    first, second, third = (engine.step()[0] for _ in range(3))
+    first, second, third = (next(e for e in engine.step() if e.event_type == "telemetry_update") for _ in range(3))
     assert first.data["cpu_pct"] == second.data["cpu_pct"] == 100.0  # clamped
     assert first.data["status"] == "degraded"
     assert first.anomalies_applied == ["cpu-spike"]

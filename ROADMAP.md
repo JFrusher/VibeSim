@@ -11,7 +11,7 @@
 ## Phase 0: Core engine ✅ (PR #1)
 Tick engine, logistics and devops domains, chaos overrides/drops/durations, REST + SSE + WebSocket, keyword compiler, 19 tests.
 
-## Phase 1: Foundations
+## Phase 1: Foundations ✅
 Done first because the package rename breaks every import, and CI makes every later PR verifiable.
 - Rename the `src/` package to `vibesim/`, with `python -m vibesim` as the entry point.
 - MIT `LICENSE`, plus `CONTRIBUTING.md` and a short `CHANGELOG.md`.
@@ -20,7 +20,7 @@ Done first because the package rename breaks every import, and CI makes every la
 
 **Done when:** CI is green, mypy strict passes, and the package imports as `vibesim`.
 
-## Phase 2: Hybrid domain engine
+## Phase 2: Hybrid domain engine ✅
 The core of "simulate anything".
 - **Declarative fields.** Each entity field has a behaviour: `constant`, `drift` (linear), `random_walk`, `mean_revert`, `cycle` (daily/sine), `derived` (a safe expression over other fields, e.g. latency from cpu), plus `min`/`max` clamps.
 - **State machines.** States with per-tick transition probabilities and guard conditions (e.g. `en_route → delayed p=0.05`, `→ out_of_battery when battery_pct == 0`).
@@ -30,16 +30,16 @@ The core of "simulate anything".
 
 **Done when:** a new domain can be written as YAML only, and devops runs with zero Python.
 
-## Phase 3: Domains v1
+## Phase 3: Domains v1 ✅
 - **Logistics + real roads:** the compiler geocodes the named places and fetches a road polyline from public OSRM, once, at creation, cached on disk. Vans follow the polyline at a speed driven by traffic. The runtime makes no network calls.
 - **IoT / smart building:** temperature, humidity, CO₂, occupancy driven by a day cycle, energy draw, HVAC state machine.
 - **E-commerce:** signups, carts, orders, payment success/failure, inventory depletion and restock, conversion rates on a time-of-day curve.
 - **Finance:** price ticks (geometric Brownian motion), a simple order book plug-in, trades, volume spikes.
-- **DevOps:** expanded with request rate, error rate, pod restarts and a dependency fan-out between services.
+- **DevOps:** expanded with request rate, error rate, pod restarts and a dependency fan-out between services. *(Fan-out deferred: entities can't yet read each other's state, so it needs a cross-entity expression design.)*
 
 **Done when:** each domain has a preset scenario and tests, and the logistics demo is realistic on a real map.
 
-## Phase 4: Compiler (keyword + optional Claude)
+## Phase 4: Compiler (keyword + optional Claude) ✅
 - The keyword compiler covers all five domains plus common modifiers (counts, weather, load, failure rates, tick rate).
 - **Claude compiler:** the Anthropic SDK with structured output targeting the `SimulationConfig` JSON schema. Output is validated by the same Pydantic models and rejected with a clear error if invalid. It is called once per creation and never per tick.
 - Selection: `compiler: keyword | claude` in the request or scenario. `claude` requires `ANTHROPIC_API_KEY` and fails fast without it, with no silent fallback.
@@ -47,7 +47,7 @@ The core of "simulate anything".
 
 **Done when:** the same prompt works through either compiler and produces a valid, runnable config.
 
-## Phase 5: Chaos v2
+## Phase 5: Chaos v2 ✅
 All chaos features are opt-in in the scenario's `chaos` block.
 - **Natural-language chaos:** `"sudden network drop on half the vans"` becomes an `Anomaly`, using the same compiler choice as above.
 - **Scheduled timelines:** `at: 100 → inject X; at: 200 → remove X`, for story-driven runs.

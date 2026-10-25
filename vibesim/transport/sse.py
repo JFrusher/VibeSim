@@ -1,19 +1,20 @@
 """Server-Sent Events stream of telemetry."""
 
-from fastapi import APIRouter, Depends
+from collections.abc import AsyncIterator
+
+from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
-from src.core.engine import Engine
-from src.transport import get_engine
+from vibesim.transport import EngineDep
 
 router = APIRouter()
 
 
 @router.get("/simulations/{simulation_id}/stream")
-async def stream(engine: Engine = Depends(get_engine)) -> StreamingResponse:
+async def stream(engine: EngineDep) -> StreamingResponse:
     queue = engine.subscribe()
 
-    async def events():
+    async def events() -> AsyncIterator[str]:
         try:
             while (event := await queue.get()) is not None:
                 yield f"data: {event.model_dump_json()}\n\n"
