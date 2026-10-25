@@ -42,6 +42,7 @@ class Engine:
         self._subscribers: set[Subscriber] = set()
         self._delayed: list[tuple[int, TelemetryEvent]] = []  # (release tick, event) held back by chaos
         self._recording: IO[str] | None = None
+        self._outputs: list[asyncio.Task[None]] = []
         if self.config.persistence.record:
             path = storage.recording_path(self.config.simulation_id)
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -156,6 +157,12 @@ class Engine:
         self.status = "running"
         self._task = asyncio.get_running_loop().create_task(self._run())
         self._task.add_done_callback(self._on_task_done)
+        if not self._outputs:
+            from vibesim.outputs import start_outputs
+
+            self._outputs = start_outputs(self)
+            for task in self._outputs:
+                task.add_done_callback(self._on_task_done)
 
     def pause(self) -> None:
         if self.status != "running":
@@ -165,6 +172,8 @@ class Engine:
 
     def stop(self) -> None:
         self._cancel()
+        for task in self._outputs:
+            task.cancel()
         self.status = "stopped"
         if self._recording:
             self._recording.close()
@@ -201,6 +210,7 @@ class Engine:
     def _on_task_done(self, task: asyncio.Task[None]) -> None:
         if not task.cancelled() and task.exception():
             log.error("simulation %s crashed", self.config.simulation_id, exc_info=task.exception())
+            self._cancel()
             self.status = "failed"
             for queue in self._subscribers:
                 self._offer(queue, None)

@@ -2,12 +2,16 @@
 
 import asyncio
 import logging
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Annotated, Any, Literal, Self
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 
 from vibesim import storage
@@ -38,6 +42,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="VibeSim", lifespan=lifespan)
+# browsers on localhost may call the API; other origins only when listed in VIBESIM_CORS_ORIGINS,
+# so an arbitrary website can't drive a local VibeSim from the user's browser
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_origins=[o for o in os.environ.get("VIBESIM_CORS_ORIGINS", "").split(",") if o],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.mount("/client", StaticFiles(directory=Path(__file__).parent.parent / "static"), name="client")
 app.include_router(sse.router)
 app.include_router(websocket.router)
 
@@ -135,6 +149,30 @@ async def advance(engine: EngineDep, ticks: Annotated[int, Query(ge=1, le=1_000_
     except RuntimeError as e:
         raise HTTPException(409, str(e)) from e
     return describe(engine)
+
+
+@app.get("/metrics")
+async def metrics() -> PlainTextResponse:
+    """Prometheus text exposition of every numeric field and status."""
+    lines = [
+        "# TYPE vibesim_tick counter",
+        "# TYPE vibesim_field gauge",
+        "# TYPE vibesim_status gauge",
+    ]
+    for sid, engine in simulations.items():
+        lines.append(f'vibesim_tick{{simulation="{_label(sid)}"}} {engine.state.tick}')
+        for eid, state in engine.state.entities.items():
+            base = f'simulation="{_label(sid)}",entity="{_label(eid)}"'
+            for field, value in state.items():
+                if isinstance(value, int | float) and not isinstance(value, bool):
+                    lines.append(f'vibesim_field{{{base},field="{_label(field)}"}} {value}')
+            if isinstance(state.get("status"), str):
+                lines.append(f'vibesim_status{{{base},status="{_label(state["status"])}"}} 1')
+    return PlainTextResponse("\n".join(lines) + "\n", media_type="text/plain; version=0.0.4")
+
+
+def _label(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 
 @app.get("/recordings")

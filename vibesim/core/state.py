@@ -145,6 +145,45 @@ class Persistence(BaseModel):
     record: bool = False
 
 
+TOPIC_FIELDS = {"simulation_id", "entity_id", "event_type"}
+
+
+class MqttOutput(BaseModel):
+    """Publish every event as JSON to an MQTT broker (needs `vibesim[mqtt]`)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    host: str = "localhost"
+    port: int = 1883
+    topic: str = "vibesim/{simulation_id}/{entity_id}"  # placeholders: simulation_id, entity_id, event_type
+    qos: Literal[0, 1] = 0
+
+    @model_validator(mode="after")
+    def known_placeholders(self) -> Self:
+        import string
+
+        used = {name for _, name, _, _ in string.Formatter().parse(self.topic) if name}
+        if unknown := used - TOPIC_FIELDS:
+            raise ValueError(f"unknown topic placeholders {sorted(unknown)}; use {sorted(TOPIC_FIELDS)}")
+        return self
+
+
+class OtlpOutput(BaseModel):
+    """Export numeric fields as OpenTelemetry gauges over OTLP/HTTP (needs `vibesim[otel]`)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    endpoint: str = "http://localhost:4318/v1/metrics"
+    export_interval_ms: int = Field(5000, ge=100)
+
+
+class Outputs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mqtt: MqttOutput | None = None
+    otlp: OtlpOutput | None = None
+
+
 class SimulationConfig(BaseModel):
     schema_version: Literal[1] = 1
     # used in file names for snapshots and recordings, so restricted to a safe alphabet
@@ -157,6 +196,7 @@ class SimulationConfig(BaseModel):
     entities: list[EntityConfig] = Field(min_length=1)
     chaos_rules: ChaosRules = ChaosRules()
     persistence: Persistence = Persistence()
+    outputs: Outputs = Outputs()
 
 
 class TelemetryEvent(BaseModel):
