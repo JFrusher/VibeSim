@@ -2,7 +2,7 @@
 
 import random
 
-from src.core.state import Anomaly
+from vibesim.core.state import Anomaly
 
 
 class ChaosInjector:

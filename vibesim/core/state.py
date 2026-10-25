@@ -2,10 +2,12 @@
 
 import copy
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+
+Domain = Literal["logistics", "devops"]
 
 
 class EntityConfig(BaseModel):
@@ -28,8 +30,9 @@ class ChaosRules(BaseModel):
 
 
 class SimulationConfig(BaseModel):
+    schema_version: Literal[1] = 1
     simulation_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    domain: Literal["logistics", "devops"]
+    domain: Domain
     tick_interval_ms: int = Field(1000, ge=100)
     seed: int = 0
     entities: list[EntityConfig] = Field(min_length=1)
@@ -53,13 +56,11 @@ class SimulationState:
 
     def __init__(self, config: SimulationConfig):
         self.tick = 0
-        self.entities: dict[str, dict[str, Any]] = {
-            e.id: copy.deepcopy(e.initial_state) for e in config.entities
-        }
+        self.entities: dict[str, dict[str, Any]] = {e.id: copy.deepcopy(e.initial_state) for e in config.entities}
 
     def snapshot(self) -> dict[str, Any]:
         return {"tick": self.tick, "entities": copy.deepcopy(self.entities)}
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)

@@ -4,7 +4,7 @@ import math
 import random
 from typing import Any
 
-from src.domains.base import DomainModel, clamp
+from vibesim.domains.base import DomainModel, clamp
 
 # (start, destination) as (lat, lon)
 ROUTES: dict[str, tuple[tuple[float, float], tuple[float, float]]] = {

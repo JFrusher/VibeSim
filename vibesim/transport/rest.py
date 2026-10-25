@@ -1,14 +1,14 @@
-"""REST control plane. Run with: uvicorn src.transport.rest:app"""
+"""REST control plane. Run with: uvicorn vibesim.transport.rest:app"""
 
-from typing import Literal
+from typing import Any, Literal, Self
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, model_validator
 
-from src.core.compiler import compile_prompt
-from src.core.engine import Engine, simulations
-from src.core.state import Anomaly, SimulationConfig
-from src.transport import get_engine, sse, websocket
+from vibesim.core.compiler import compile_prompt
+from vibesim.core.engine import Engine, simulations
+from vibesim.core.state import Anomaly, SimulationConfig
+from vibesim.transport import EngineDep, sse, websocket
 
 app = FastAPI(title="VibeSim")
 app.include_router(sse.router)
@@ -23,13 +23,13 @@ class CreateSimulation(BaseModel):
     seed: int = 0
 
     @model_validator(mode="after")
-    def one_source(self):
+    def one_source(self) -> Self:
         if (self.prompt is None) == (self.config is None):
             raise ValueError("provide exactly one of 'prompt' or 'config'")
         return self
 
 
-def describe(engine: Engine) -> dict:
+def describe(engine: Engine) -> dict[str, Any]:
     return {
         "simulation_id": engine.config.simulation_id,
         "status": engine.status,
@@ -39,12 +39,12 @@ def describe(engine: Engine) -> dict:
 
 
 @app.post("/simulations", status_code=201)
-async def create_simulation(body: CreateSimulation) -> dict:
+async def create_simulation(body: CreateSimulation) -> dict[str, Any]:
     try:
-        config = body.config or compile_prompt(body.prompt, seed=body.seed)
+        config = body.config if body.config is not None else compile_prompt(str(body.prompt), seed=body.seed)
         engine = Engine(config)
     except ValueError as e:
-        raise HTTPException(422, str(e))
+        raise HTTPException(422, str(e)) from e
     if config.simulation_id in simulations:
         raise HTTPException(409, f"simulation '{config.simulation_id}' already exists")
     simulations[config.simulation_id] = engine
@@ -53,39 +53,39 @@ async def create_simulation(body: CreateSimulation) -> dict:
 
 
 @app.get("/simulations/{simulation_id}/state")
-async def get_state(engine: Engine = Depends(get_engine)) -> dict:
+async def get_state(engine: EngineDep) -> dict[str, Any]:
     return describe(engine)
 
 
 @app.delete("/simulations/{simulation_id}", status_code=204)
-async def delete_simulation(engine: Engine = Depends(get_engine)) -> None:
+async def delete_simulation(engine: EngineDep) -> None:
     engine.stop()
     del simulations[engine.config.simulation_id]
 
 
 @app.post("/simulations/{simulation_id}/chaos", status_code=201)
-async def inject_chaos(anomaly: Anomaly, engine: Engine = Depends(get_engine)) -> dict:
+async def inject_chaos(anomaly: Anomaly, engine: EngineDep) -> dict[str, Any]:
     try:
         engine.inject(anomaly)
     except ValueError as e:
-        raise HTTPException(409, str(e))
+        raise HTTPException(409, str(e)) from e
     return describe(engine)
 
 
 @app.delete("/simulations/{simulation_id}/chaos/{name}")
-async def remove_chaos(name: str, engine: Engine = Depends(get_engine)) -> dict:
+async def remove_chaos(name: str, engine: EngineDep) -> dict[str, Any]:
     try:
         engine.chaos.remove(name)
     except KeyError:
-        raise HTTPException(404, f"anomaly '{name}' not active")
+        raise HTTPException(404, f"anomaly '{name}' not active") from None
     return describe(engine)
 
 
 # declared last so the literal /chaos route above wins the match
 @app.post("/simulations/{simulation_id}/{action}")
-async def control(action: Literal["start", "pause", "step", "stop"], engine: Engine = Depends(get_engine)) -> dict:
+async def control(action: Literal["start", "pause", "step", "stop"], engine: EngineDep) -> dict[str, Any]:
     try:
         getattr(engine, action)()
     except RuntimeError as e:
-        raise HTTPException(409, str(e))
+        raise HTTPException(409, str(e)) from e
     return describe(engine)

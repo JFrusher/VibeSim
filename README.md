@@ -6,7 +6,7 @@ Local-first, promptable micro-emulator. Describe a world in one sentence, get a 
 
 ```bash
 pip install -e ".[dev]"
-uvicorn src.transport.rest:app --reload
+python -m vibesim            # http://127.0.0.1:8000, add --host 0.0.0.0 to expose
 ```
 
 ```bash
