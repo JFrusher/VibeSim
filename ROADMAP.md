@@ -65,7 +65,7 @@ Each feature is independently opt-in.
 
 **Done when:** you can kill the server, restart it, and the simulations carry on, and a recorded run replays byte-identical.
 
-## Phase 7: Transports and integrations
+## Phase 7: Transports and integrations ✅
 Each one is opt-in per simulation or server.
 - **Browser:** CORS config and a tiny dependency-free JS client (`vibesim.js`) for SSE and WebSocket.
 - **MQTT:** publishes to a broker, with topic templates such as `vibesim/{sim}/{entity}`.
