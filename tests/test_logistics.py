@@ -2,21 +2,24 @@ import random
 
 import pytest
 
-from src.core.engine import Engine
-from src.core.state import Anomaly, EntityConfig, SimulationConfig
-from src.domains.logistics import ROUTES, LogisticsDomain
+from vibesim.core.engine import Engine
+from vibesim.core.state import Anomaly, EntityConfig, SimulationConfig
+from vibesim.domains.logistics import ROUTES, LogisticsDomain
 
 
 def van(i: int, route: str = "southampton_to_winchester", **rules) -> EntityConfig:
     lat, lon = ROUTES[route][0]
-    return EntityConfig(id=f"van-{i:02d}", type="delivery_vehicle",
-                        initial_state={"lat": lat, "lon": lon, "battery_pct": 98.5, "status": "en_route"},
-                        behavior_rules={"speed_kmh": 45, "battery_drain_rate": 0.1, "route": route,
-                                        "traffic_delay_prob": 0.0, **rules})
+    return EntityConfig(
+        id=f"van-{i:02d}",
+        type="delivery_vehicle",
+        initial_state={"lat": lat, "lon": lon, "battery_pct": 98.5, "status": "en_route"},
+        behavior_rules={"speed_kmh": 45, "battery_drain_rate": 0.1, "route": route, "traffic_delay_prob": 0.0, **rules},
+    )
 
 
 def test_three_vans_move_toward_destination_over_10_ticks():
-    engine = Engine(SimulationConfig(domain="logistics", entities=[van(1), van(2), van(3, "southampton_to_portsmouth")]))
+    vans = [van(1), van(2), van(3, "southampton_to_portsmouth")]
+    engine = Engine(SimulationConfig(domain="logistics", entities=vans))
     start = {k: dict(v) for k, v in engine.state.entities.items()}
     for _ in range(10):
         engine.step()
@@ -62,6 +65,6 @@ def test_chaos_override_reflected_immediately():
 
 
 def test_unknown_route_rejected_at_creation():
+    bad = van(1).model_copy(update={"behavior_rules": {"speed_kmh": 1, "battery_drain_rate": 0.1, "route": "nowhere"}})
     with pytest.raises(ValueError, match="unknown route"):
-        Engine(SimulationConfig(domain="logistics", entities=[van(1, route="southampton_to_winchester")
-                                                               .model_copy(update={"behavior_rules": {"speed_kmh": 1, "battery_drain_rate": 0.1, "route": "nowhere"}})]))
+        Engine(SimulationConfig(domain="logistics", entities=[bad]))

@@ -6,16 +6,16 @@ Runs once at creation, never per tick.
 
 import re
 
-from src.core.state import EntityConfig, SimulationConfig
-from src.domains.logistics import ROUTES
+from vibesim.core.state import Domain, EntityConfig, SimulationConfig
+from vibesim.domains.logistics import ROUTES
 
-DOMAIN_KEYWORDS = {
+DOMAIN_KEYWORDS: dict[Domain, tuple[str, ...]] = {
     "logistics": ("van", "truck", "lorry", "vehicle", "fleet", "delivery", "deliveries", "courier"),
     "devops": ("server", "service", "microservice", "cpu", "node", "pod", "api", "cluster"),
 }
-NUMBER_WORDS = {w: i for i, w in enumerate(
-    "zero one two three four five six seven eight nine ten eleven twelve".split()
-)}
+NUMBER_WORDS = {
+    w: i for i, w in enumerate("zero one two three four five six seven eight nine ten eleven twelve".split())
+}
 DEFAULT_COUNT = 3
 
 
@@ -23,7 +23,8 @@ def compile_prompt(prompt: str, seed: int = 0) -> SimulationConfig:
     text = prompt.lower()
     words = re.findall(r"[a-z]+|\d+", text)
     domain = _detect_domain(words)
-    count = next((int(w) if w.isdigit() else NUMBER_WORDS[w] for w in words if w.isdigit() or w in NUMBER_WORDS), DEFAULT_COUNT)
+    counts = (int(w) if w.isdigit() else NUMBER_WORDS[w] for w in words if w.isdigit() or w in NUMBER_WORDS)
+    count = next(counts, DEFAULT_COUNT)
     if count < 1:
         raise ValueError("prompt must describe at least one entity")
     hz = re.search(r"(\d+)\s*hz", text)
@@ -34,7 +35,7 @@ def compile_prompt(prompt: str, seed: int = 0) -> SimulationConfig:
     return SimulationConfig(domain=domain, tick_interval_ms=tick_interval_ms, seed=seed, entities=entities)
 
 
-def _detect_domain(words: list[str]) -> str:
+def _detect_domain(words: list[str]) -> Domain:
     stems = {w.rstrip("s") for w in words} | set(words)
     for domain, keywords in DOMAIN_KEYWORDS.items():
         if stems & set(keywords):
@@ -53,17 +54,19 @@ def _logistics_entities(text: str, words: list[str], count: int) -> list[EntityC
     for i in range(count):
         route = route_names[i % len(route_names)]
         lat, lon = ROUTES[route][0]
-        entities.append(EntityConfig(
-            id=f"van-{i + 1:02d}",
-            type="delivery_vehicle",
-            initial_state={"lat": lat, "lon": lon, "battery_pct": 100.0, "status": "en_route"},
-            behavior_rules={
-                "speed_kmh": 45,
-                "battery_drain_rate": 0.3 if "drain" in text else 0.1,
-                "route": route,
-                "traffic_delay_prob": round(delay_prob, 2),
-            },
-        ))
+        entities.append(
+            EntityConfig(
+                id=f"van-{i + 1:02d}",
+                type="delivery_vehicle",
+                initial_state={"lat": lat, "lon": lon, "battery_pct": 100.0, "status": "en_route"},
+                behavior_rules={
+                    "speed_kmh": 45,
+                    "battery_drain_rate": 0.3 if "drain" in text else 0.1,
+                    "route": route,
+                    "traffic_delay_prob": round(delay_prob, 2),
+                },
+            )
+        )
     return entities
 
 

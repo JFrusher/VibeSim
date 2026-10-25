@@ -2,17 +2,22 @@ import asyncio
 
 import pytest
 
-from src.core.engine import Engine
-from src.core.state import Anomaly, EntityConfig, SimulationConfig
+from vibesim.core.engine import Engine
+from vibesim.core.state import Anomaly, EntityConfig, SimulationConfig
 
 
 def devops_config(**kw) -> SimulationConfig:
     return SimulationConfig(
         domain="devops",
         tick_interval_ms=100,
-        entities=[EntityConfig(id="svc-01", type="microservice",
-                               initial_state={"cpu_pct": 35.0, "memory_pct": 40.0, "latency_ms": 40.0},
-                               behavior_rules={"memory_leak_rate": 1.0, "volatility": 0.0})],
+        entities=[
+            EntityConfig(
+                id="svc-01",
+                type="microservice",
+                initial_state={"cpu_pct": 35.0, "memory_pct": 40.0, "latency_ms": 40.0},
+                behavior_rules={"memory_leak_rate": 1.0, "volatility": 0.0},
+            )
+        ],
         **kw,
     )
 

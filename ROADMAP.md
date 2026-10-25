@@ -11,7 +11,7 @@
 ## Phase 0: Core engine ✅ (PR #1)
 Tick engine, logistics and devops domains, chaos overrides/drops/durations, REST + SSE + WebSocket, keyword compiler, 19 tests.
 
-## Phase 1: Foundations
+## Phase 1: Foundations ✅
 Done first because the package rename breaks every import, and CI makes every later PR verifiable.
 - Rename the `src/` package to `vibesim/`, with `python -m vibesim` as the entry point.
 - MIT `LICENSE`, plus `CONTRIBUTING.md` and a short `CHANGELOG.md`.

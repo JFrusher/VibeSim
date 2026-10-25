@@ -1,6 +1,6 @@
 import pytest
 
-from src.core.compiler import compile_prompt
+from vibesim.core.compiler import compile_prompt
 
 
 def test_rainy_delivery_fleet():

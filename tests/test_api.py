@@ -2,7 +2,7 @@ import json
 
 from fastapi.testclient import TestClient
 
-from src.transport.rest import app
+from vibesim.transport.rest import app
 
 
 def test_create_control_chaos_and_websocket():

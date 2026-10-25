@@ -15,7 +15,8 @@ class DomainModel(ABC):
 
     def validate(self, entity_id: str, state: dict[str, Any], rules: dict[str, Any]) -> None:
         """Reject configs that would crash mid-simulation."""
-        missing = [k for k in self.required_state if k not in state] + [k for k in self.required_rules if k not in rules]
+        missing = [k for k in self.required_state if k not in state]
+        missing += [k for k in self.required_rules if k not in rules]
         if missing:
             raise ValueError(f"entity '{entity_id}' is missing {missing}")
 
