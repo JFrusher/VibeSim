@@ -20,4 +20,16 @@ def dump_scenario(config: SimulationConfig, fmt: str = "yaml") -> str:
     data = config.model_dump(mode="json", exclude_defaults=True, exclude={"simulation_id"})
     if fmt == "json":
         return json.dumps(data, indent=2)
-    return yaml.safe_dump(data, sort_keys=False)
+    return yaml.dump(data, Dumper=_Dumper, sort_keys=False, width=120)
+
+
+class _Dumper(yaml.SafeDumper):
+    """Block style, except lists of scalars stay on one line, so [lat, lon] paths stay compact."""
+
+
+def _represent_list(dumper: yaml.SafeDumper, items: list[object]) -> yaml.Node:
+    flat = all(not isinstance(i, dict | list) for i in items)
+    return dumper.represent_sequence("tag:yaml.org,2002:seq", items, flow_style=flat)
+
+
+_Dumper.add_representer(list, _represent_list)

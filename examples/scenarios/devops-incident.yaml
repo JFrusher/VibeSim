@@ -1,0 +1,83 @@
+# A bad deploy ramps CPU on svc-01, then a partition drops and delays half the fleet's telemetry.
+# Run it: vibesim run examples/scenarios/devops-incident.yaml
+domain: devops
+start_time: '2026-01-05T08:00:00Z'
+entities:
+- id: svc
+  type: microservice
+  count: 4
+  initial_state:
+    cpu_pct: 35.0
+    memory_pct: 40.0
+    pod_restarts: 0
+    status: healthy
+  fields:
+    requests_per_s:
+      min: 0.0
+      noise: 10.0
+      round: 1
+      behavior: cycle
+      base: 200.0
+      amplitude: 100.0
+      period_s: 86400.0
+    cpu_pct:
+      min: 0.0
+      max: 100.0
+      noise: 5.0
+      round: 2
+      behavior: mean_revert
+      target: 35.0
+    memory_pct:
+      min: 0.0
+      max: 100.0
+      noise: 1.0
+      round: 2
+      behavior: derived
+      expr: 40 if status == 'restarting' else memory_pct + 0.5 * dt
+    latency_ms:
+      min: 0.0
+      noise: 2.0
+      round: 2
+      behavior: derived
+      expr: 40 * (1 + cpu_pct / 100) ** 3
+    error_rate_pct:
+      min: 0.0
+      max: 100.0
+      noise: 0.05
+      round: 2
+      behavior: derived
+      expr: 0.1 + max(0, cpu_pct - 80) * 0.5 + (100 if status == 'restarting' else 0)
+    pod_restarts:
+      behavior: derived
+      expr: pod_restarts + (1 if status == 'restarting' else 0)
+  machine:
+  - source: healthy
+    target: degraded
+    when: cpu_pct > 90 or memory_pct > 95
+  - source: degraded
+    target: healthy
+    when: not (cpu_pct > 90 or memory_pct > 95)
+  - source: degraded
+    target: restarting
+    p: 0.1
+  - source: restarting
+    target: healthy
+    p: 1.0
+chaos_rules:
+  timeline:
+  - at_tick: 60
+    inject:
+      name: deploy-spike
+      targets: [svc-01]
+      set:
+        cpu_pct: 97
+      ramp_ticks: 20
+      duration_ticks: 60
+  - at_tick: 150
+    inject:
+      name: network-partition
+      targets: [svc-03, svc-04]
+      drop_rate: 0.6
+      delay_ticks: 2
+      jitter_ticks: 3
+      duration_ticks: 45

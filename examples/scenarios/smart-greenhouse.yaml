@@ -1,0 +1,42 @@
+# A custom domain in pure YAML, no Python: sunlight drives heat, heat dries the soil, irrigation kicks in.
+# Run it: vibesim run examples/scenarios/smart-greenhouse.yaml
+domain: agriculture
+time_scale: 60.0
+start_time: '2026-01-05T08:00:00Z'
+entities:
+- id: greenhouse
+  type: greenhouse
+  count: 3
+  initial_state:
+    soil_moisture_pct: 70.0
+    status: ok
+  fields:
+    light_lux:
+      min: 0.0
+      round: 0
+      behavior: cycle
+      base: 20000.0
+      amplitude: 25000.0
+      period_s: 86400.0
+      phase_s: -21600.0
+    temp_c:
+      noise: 0.3
+      round: 1
+      behavior: derived
+      expr: 14 + light_lux / 3000
+    soil_moisture_pct:
+      min: 0.0
+      max: 100.0
+      round: 1
+      behavior: derived
+      expr: soil_moisture_pct + dt * ((0.05 if status == 'watering' else 0) - 0.0004 * temp_c)
+  machine:
+  - source: ok
+    target: dry
+    when: soil_moisture_pct < 35
+  - source: dry
+    target: watering
+    p: 0.01
+  - source: watering
+    target: ok
+    when: soil_moisture_pct > 75

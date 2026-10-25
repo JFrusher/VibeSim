@@ -1,0 +1,83 @@
+# Black Friday traffic with random payment outages and CDN hiccups, seeded so every run tells the same story.
+# Run it: vibesim run examples/scenarios/ecommerce-black-friday.yaml
+domain: ecommerce
+start_time: '2026-01-05T08:00:00Z'
+entities:
+- id: store
+  type: store
+  count: 2
+  initial_state:
+    avg_order_value: 42.0
+    inventory: 500.0
+    orders_total: 0.0
+    revenue_total: 0.0
+    signups_total: 0.0
+    status: in_stock
+  fields:
+    visitors_per_min:
+      min: 0.0
+      noise: 30.0
+      round: 1
+      behavior: cycle
+      base: 300.0
+      amplitude: 150.0
+      period_s: 86400.0
+    conversion_pct:
+      min: 0.0
+      max: 100.0
+      noise: 0.2
+      round: 2
+      behavior: mean_revert
+      target: 3.0
+    payment_failure_pct:
+      min: 0.0
+      max: 100.0
+      noise: 0.2
+      round: 2
+      behavior: mean_revert
+      target: 1.5
+    orders_per_min:
+      round: 2
+      behavior: derived
+      expr: visitors_per_min * conversion_pct / 100 * (1 if inventory > 0 else 0)
+    orders_total:
+      round: 2
+      behavior: derived
+      expr: orders_total + orders_per_min * (1 - payment_failure_pct / 100) * dt / 60
+    revenue_total:
+      round: 2
+      behavior: derived
+      expr: revenue_total + orders_per_min * (1 - payment_failure_pct / 100) * avg_order_value * dt / 60
+    signups_total:
+      round: 2
+      behavior: derived
+      expr: signups_total + visitors_per_min * 0.01 * dt / 60
+    inventory:
+      min: 0.0
+      round: 2
+      behavior: derived
+      expr: inventory - orders_per_min * dt / 60 + (5 * dt if status == 'restocking' else 0)
+  machine:
+  - source: in_stock
+    target: low_stock
+    when: inventory < 100
+  - source: [in_stock, low_stock]
+    target: out_of_stock
+    when: inventory <= 0
+  - source: [low_stock, out_of_stock]
+    target: restocking
+    p: 0.05
+  - source: restocking
+    target: in_stock
+    when: inventory >= 400
+chaos_rules:
+  random:
+    per_minute: 3.0
+    catalogue:
+    - name: payment-outage
+      set:
+        payment_failure_pct: 60
+      duration_ticks: 20
+    - name: cdn-hiccup
+      drop_rate: 0.5
+      duration_ticks: 10

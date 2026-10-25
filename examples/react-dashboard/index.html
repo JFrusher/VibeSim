@@ -1,0 +1,70 @@
+<!doctype html>
+<!--
+  A React dashboard fed by VibeSim, no build step.
+    1. vibesim run examples/scenarios/devops-incident.yaml
+    2. python -m http.server 3000 --directory examples/react-dashboard
+    3. open http://localhost:3000/?sim=<simulation id printed by step 1>
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fleet Dashboard</title>
+<style>
+  body { font: 14px system-ui, sans-serif; margin: 24px; background: #0f1115; color: #e8eaee; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+  .card { background: #171a21; border: 1px solid #262b35; border-radius: 10px; padding: 14px; }
+  .card.bad { border-color: #e03131; }
+  .metric { display: flex; justify-content: space-between; font-family: ui-monospace, monospace; }
+  .stale { opacity: .4; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="module">
+  import React, { useEffect, useState } from "https://esm.sh/react@18.3.1";
+  import { createRoot } from "https://esm.sh/react-dom@18.3.1/client";
+  import htm from "https://esm.sh/htm@3.1.1";
+  const html = htm.bind(React.createElement);
+  const BASE = "http://127.0.0.1:8000";
+  const SIM = new URLSearchParams(location.search).get("sim");
+
+  // the app under test: how does it cope with spikes, restarts and missing telemetry?
+  function useTelemetry(simId) {
+    const [entities, setEntities] = useState({});
+    useEffect(() => {
+      const source = new EventSource(`${BASE}/simulations/${simId}/stream`);
+      source.onmessage = (message) => {
+        const event = JSON.parse(message.data);
+        if (event.event_type !== "telemetry_update") return;
+        setEntities((prev) => ({ ...prev, [event.entity_id]: { ...event.data, seenAt: Date.now() } }));
+      };
+      return () => source.close();
+    }, [simId]);
+    return entities;
+  }
+
+  function Service({ id, data, now }) {
+    const stale = now - data.seenAt > 3000;  // dropped telemetry shows up as staleness
+    const bad = data.status !== "healthy";
+    return html`<div class="card ${bad ? "bad" : ""} ${stale ? "stale" : ""}">
+      <strong>${id}</strong> · ${data.status}${stale ? " · no signal" : ""}
+      ${["cpu_pct", "memory_pct", "latency_ms", "error_rate_pct"].map((k) =>
+        html`<div class="metric" key=${k}><span>${k}</span><span>${data[k]}</span></div>`)}
+    </div>`;
+  }
+
+  function App() {
+    const entities = useTelemetry(SIM);
+    const [now, setNow] = useState(Date.now());
+    useEffect(() => { const t = setInterval(() => setNow(Date.now()), 500); return () => clearInterval(t); }, []);
+    if (!SIM) return html`<p>Add <code>?sim=&lt;id&gt;</code> from <code>vibesim run</code>.</p>`;
+    return html`<h1>Fleet</h1><div class="grid">
+      ${Object.entries(entities).map(([id, data]) => html`<${Service} key=${id} id=${id} data=${data} now=${now} />`)}
+    </div>`;
+  }
+
+  createRoot(document.getElementById("root")).render(html`<${App} />`);
+</script>
+</body>
+</html>

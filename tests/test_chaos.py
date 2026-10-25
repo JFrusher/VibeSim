@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 from vibesim.chaos.compiler import compile_chaos
 from vibesim.core.engine import Engine
 from vibesim.core.state import Anomaly, ChaosRules, EntityConfig, RandomChaos, SimulationConfig, TimelineStep
+from vibesim.domains.devops import microservice
 from vibesim.transport.rest import app
 
 
@@ -127,3 +128,28 @@ def test_chaos_prompt_endpoint():
         assert state["entities"]["svc-02"]["cpu_pct"] == 100.0
         assert http.post(f"/simulations/{sid}/chaos/prompt", json={"prompt": "vibes"}).status_code == 422
         http.delete(f"/simulations/{sid}")
+
+
+def test_forced_fields_stay_consistent_with_dependents_and_machine():
+    """A forced cpu must not evolve mid-tick: derived fields and the machine see the forced value."""
+    engine = Engine(SimulationConfig(domain="devops", entities=[microservice("svc", count=3)]))
+    engine.inject(Anomaly(name="storm", set={"cpu_pct": 99}))
+    previous: dict[str, str] = {}
+    for _ in range(60):
+        for event in telemetry(engine.step()):
+            status = event.data["status"]
+            assert event.data["cpu_pct"] == 99
+            assert event.data["error_rate_pct"] > 5
+            # healthy only for the one tick a restart takes; otherwise the forced cpu keeps it degraded
+            assert status != "healthy" or previous.get(event.entity_id) == "restarting"
+            previous[event.entity_id] = status
+
+
+def test_forced_status_is_not_overridden_by_the_machine():
+    engine = Engine(SimulationConfig(domain="devops", entities=[microservice("svc")]))
+    engine.inject(Anomaly(name="down", set={"status": "down"}))
+    events = [e for _ in range(10) for e in engine.step()]
+    assert {e.data["status"] for e in telemetry(events)} == {"down"}
+    assert [e.data for e in events if e.event_type == "state_changed"] == [
+        {"field": "status", "from": "healthy", "to": "down"}
+    ]

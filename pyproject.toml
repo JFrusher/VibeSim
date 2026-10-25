@@ -1,11 +1,29 @@
 [project]
 name = "vibesim"
-version = "0.1.0"
+version = "1.0.0"
 description = "Promptable local-first micro-emulator that streams stateful simulated telemetry."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
+authors = [{ name = "Jacob Frusher" }]
+keywords = ["simulation", "mock data", "telemetry", "emulator", "sse", "websocket", "mqtt", "testing"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Framework :: FastAPI",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Testing :: Mocking",
+    "Typing :: Typed",
+]
 dependencies = ["fastapi>=0.110", "uvicorn>=0.29", "pydantic>=2.6", "pyyaml>=6"]
+
+[project.urls]
+Homepage = "https://github.com/JFrusher/VibeSim"
+Documentation = "https://jfrusher.github.io/VibeSim/"
+Changelog = "https://github.com/JFrusher/VibeSim/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 claude = ["anthropic>=2.3"]
@@ -23,6 +41,7 @@ dev = [
     "httpx>=0.27",
     "ruff>=0.6",
     "mypy>=1.11",
+    "mkdocs-material>=9.5",
 ]
 
 [build-system]
@@ -39,10 +58,11 @@ vibesim = "vibesim.testing"
 include = ["vibesim*"]
 
 [tool.setuptools.package-data]
-vibesim = ["static/*"]
+vibesim = ["static/*", "py.typed"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+testpaths = ["tests", "examples/pytest"]
 
 [tool.ruff]
 line-length = 120

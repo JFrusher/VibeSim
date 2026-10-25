@@ -7,10 +7,14 @@ Use it as a library, no server needed:
     events = engine.step()
 """
 
+from importlib.metadata import version
+
 from vibesim.core.compiler import compile_prompt, compile_with
 from vibesim.core.engine import Engine
 from vibesim.core.state import Anomaly, EntityConfig, SimulationConfig, TelemetryEvent
 from vibesim.scenario import dump_scenario, load_scenario
+
+__version__ = version("vibesim")
 
 __all__ = [
     "Anomaly",
