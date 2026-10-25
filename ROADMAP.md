@@ -56,7 +56,7 @@ All chaos features are opt-in in the scenario's `chaos` block.
 
 **Done when:** a scenario file can script a full incident story that replays identically with the same seed.
 
-## Phase 6: Time and persistence
+## Phase 6: Time and persistence ✅
 Each feature is independently opt-in.
 - **Scenario files:** save and load a full config, including the chaos timeline, as YAML/JSON. `GET /simulations/{id}/scenario` exports it.
 - **Snapshots:** periodic state snapshots to disk; on restart, simulations resume from their last snapshot.
