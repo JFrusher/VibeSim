@@ -1,0 +1,9 @@
+# Scrape VibeSim into Prometheus, then chart it in Grafana:
+#   vibesim run examples/scenarios/devops-incident.yaml
+#   prometheus --config.file=examples/prometheus/prometheus.yml
+# Try: vibesim_field{field="cpu_pct"}   or   sum by (status) (vibesim_status)
+scrape_configs:
+  - job_name: vibesim
+    scrape_interval: 5s
+    static_configs:
+      - targets: ["127.0.0.1:8000"]

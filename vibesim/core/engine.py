@@ -74,8 +74,8 @@ class Engine:
             previous_status = state.get("status")
             state.update(overrides)  # tick reacts to forced values
             runtime.clamp(state)
-            runtime.tick(state, tick, dt_s, self.rng)
-            state.update(overrides)  # payload shows forced values
+            runtime.tick(state, tick, dt_s, self.rng, frozenset(overrides))
+            state.update(overrides)  # plugins may have moved fields they own; the payload shows forced values
             runtime.clamp(state)
             if ChaosInjector.should_drop(anomalies, self.chaos_rng):
                 continue

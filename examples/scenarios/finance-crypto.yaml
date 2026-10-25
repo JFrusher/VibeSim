@@ -1,0 +1,23 @@
+# Two crypto instruments: geometric Brownian motion prices, a live order book and volume spikes.
+# Run it: vibesim run examples/scenarios/finance-crypto.yaml
+domain: finance
+start_time: '2026-01-05T08:00:00Z'
+entities:
+- id: btc
+  type: instrument
+  initial_state:
+    symbol: BTC
+    price: 100.0
+  plugin:
+    name: market
+    params:
+      annual_volatility: 0.8
+- id: eth
+  type: instrument
+  initial_state:
+    symbol: ETH
+    price: 100.0
+  plugin:
+    name: market
+    params:
+      annual_volatility: 0.8

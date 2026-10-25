@@ -36,11 +36,16 @@ class EntityRuntime:
                 state[name] = spec.base if isinstance(spec, Cycle) else 0.0
         return state
 
-    def tick(self, state: dict[str, Any], tick: int, dt_s: float, rng: random.Random) -> None:
+    def tick(
+        self, state: dict[str, Any], tick: int, dt_s: float, rng: random.Random, frozen: frozenset[str] = frozenset()
+    ) -> None:
+        """Advance one tick. Chaos holds `frozen` fields: they don't evolve, so dependents read the forced value."""
         if self.plugin:
             self.plugin.tick(state, dt_s, rng)
         t = tick * dt_s
         for name, spec, expr, when in self.fields:
+            if name in frozen:
+                continue
             env = {**state, "t": t, "tick": tick, "dt": dt_s}
             if when and not when(env):
                 continue
@@ -48,6 +53,8 @@ class EntityRuntime:
             state[name] = _bound(spec, _advance(spec, state[name], expr, env, t, dt_s, rng))
         if self.plugin:
             self.plugin.clamp(state)
+        if "status" in frozen:
+            return
         env = {**state, "t": t, "tick": tick, "dt": dt_s}
         for transition, when in self.machine:
             if not _matches(transition.source, state["status"]):

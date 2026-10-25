@@ -81,7 +81,7 @@ Each one is opt-in per simulation or server.
 
 **Done when:** `pip install vibesim && vibesim run "..."` opens a working demo.
 
-## Phase 9: Docs, examples, v1.0 release
+## Phase 9: Docs, examples, v1.0 release ✅
 - MkDocs site on GitHub Pages: quickstart, a scenario schema reference (generated from the Pydantic models), domain guides, an integration guide per transport, and a page on writing a plug-in.
 - Examples gallery: a preset scenario per domain, a sample React dashboard consuming the SSE stream, Node-RED/Grafana MQTT recipes and a pytest example.
 - PyPI publishing via GitHub Actions trusted publishing on tag, semantic versioning, `v1.0.0`.
@@ -91,7 +91,11 @@ Each one is opt-in per simulation or server.
 ---
 
 ## Open risks
-- **PyPI name:** `vibesim` must be checked as free before Phase 9; this affects the package rename in Phase 1.
+- **PyPI name:** `vibesim` was free on 2026-10-25. It is claimed by the first published release.
 - **OSRM public server:** it is fair-use only, so heavy use needs a self-hosted URL. Kept as config, not a second code path.
 - **Claude structured output:** large configs (many entities) should be generated as templates plus a count, not entity-by-entity.
 - **Scope:** Phases 2, 3 and 7 are the largest; each may split into two PRs if review gets heavy.
+
+## After 1.0
+- DevOps dependency fan-out: entities that read each other's state (cross-entity expressions).
+- MQTT reconnects with backoff (today a lost broker fails the simulation).

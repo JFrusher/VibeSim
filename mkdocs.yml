@@ -1,0 +1,31 @@
+site_name: VibeSim
+site_description: Promptable local-first simulations that stream living telemetry.
+repo_url: https://github.com/JFrusher/VibeSim
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle: {icon: material/brightness-7, name: Dark mode}
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle: {icon: material/brightness-4, name: Light mode}
+  features: [content.code.copy, navigation.sections]
+markdown_extensions:
+  - admonition
+  - tables
+  - pymdownx.highlight
+  - pymdownx.superfences
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - Guides:
+      - Describing a world: worlds.md
+      - Compilers: compilers.md
+      - Chaos: chaos.md
+      - Time, persistence and replay: time.md
+      - Integrations: integrations.md
+      - Writing a plugin: plugins.md
+  - Reference:
+      - HTTP API: api.md
+      - Config: reference/config.md

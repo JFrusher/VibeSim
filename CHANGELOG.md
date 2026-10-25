@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 1.0.0 (2026-10-25)
+
+First stable release.
+
 
 - Core engine: tick loop, logistics and devops domains, chaos overrides, REST/SSE/WebSocket, keyword compiler.
 - Package renamed `src` → `vibesim`; `python -m vibesim` serves on 127.0.0.1 by default.
@@ -13,3 +16,5 @@
 - Time and persistence: `time_scale`, simulated-clock timestamps from `start_time`, snapshots with exact resume after restart, JSONL recording and `POST /replays`, fast-forward `advance`, YAML/JSON scenario files and export, `GET /simulations`. `simulation_id` is restricted to `[A-Za-z0-9_-]`.
 - Integrations: localhost-only CORS (extend via `VIBESIM_CORS_ORIGINS`), browser client at `/client/vibesim.js`, MQTT and OTLP outputs (`vibesim[mqtt]`, `vibesim[otel]`), Prometheus `/metrics`, top-level library API, `vibesim` pytest fixture.
 - `vibesim` CLI (`run`, `compile`, `replay`, `serve`) and a no-build web console at `/` (live map for geo entities, sparkline table, controls, fast-forward, chaos buttons and plain English, scenario load/export). CDN assets pinned with SRI hashes.
+- Docs site (MkDocs, GitHub Pages) with a generated config reference, an examples gallery (a scenario per domain, React dashboard, pytest, Prometheus, MQTT), PyPI trusted-publishing release workflow.
+- Fix: chaos-forced fields no longer evolve mid-tick, so derived fields and the status machine see the forced value (a forced `cpu_pct` used to let a service report `healthy`).
