@@ -1,4 +1,4 @@
-"""Domain interface: how one entity's state advances per tick."""
+"""Plugin interface for physics the declarative fields can't express."""
 
 import random
 from abc import ABC, abstractmethod
@@ -9,26 +9,19 @@ def clamp(value: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, value))
 
 
-class DomainModel(ABC):
-    required_state: tuple[str, ...]
-    required_rules: tuple[str, ...] = ()
-
-    def validate(self, entity_id: str, state: dict[str, Any], rules: dict[str, Any]) -> None:
-        """Reject configs that would crash mid-simulation."""
-        missing = [k for k in self.required_state if k not in state]
-        missing += [k for k in self.required_rules if k not in rules]
-        if missing:
-            raise ValueError(f"entity '{entity_id}' is missing {missing}")
+class Plugin(ABC):
+    """One instance per entity. Validate and precompute in __init__; raise ValueError on bad params."""
 
     @abstractmethod
-    def tick(self, state: dict[str, Any], rules: dict[str, Any], dt_s: float, rng: random.Random) -> None:
+    def __init__(self, params: dict[str, Any]): ...
+
+    @abstractmethod
+    def init_state(self, state: dict[str, Any]) -> None:
+        """Fill in any state fields the plugin owns that the config left out."""
+
+    @abstractmethod
+    def tick(self, state: dict[str, Any], dt_s: float, rng: random.Random) -> None:
         """Advance `state` in place by `dt_s` simulated seconds."""
 
-    def apply_chaos(self, state: dict[str, Any], overrides: dict[str, Any]) -> None:
-        """Force anomaly overrides onto `state`, then re-clamp to physical bounds."""
-        state.update(overrides)
-        self.clamp(state)
-
-    @abstractmethod
-    def clamp(self, state: dict[str, Any]) -> None:
-        """Keep every numeric field inside realistic physical bounds."""
+    def clamp(self, state: dict[str, Any]) -> None:  # noqa: B027 - optional hook
+        """Keep plugin-owned fields inside physical bounds."""

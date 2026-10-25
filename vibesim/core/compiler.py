@@ -6,10 +6,11 @@ Runs once at creation, never per tick.
 
 import re
 
-from vibesim.core.state import Domain, EntityConfig, SimulationConfig
-from vibesim.domains.logistics import ROUTES
+from vibesim.core.state import EntityConfig, SimulationConfig
+from vibesim.domains.devops import microservice
+from vibesim.domains.logistics import ROUTES, delivery_van
 
-DOMAIN_KEYWORDS: dict[Domain, tuple[str, ...]] = {
+DOMAIN_KEYWORDS: dict[str, tuple[str, ...]] = {
     "logistics": ("van", "truck", "lorry", "vehicle", "fleet", "delivery", "deliveries", "courier"),
     "devops": ("server", "service", "microservice", "cpu", "node", "pod", "api", "cluster"),
 }
@@ -35,7 +36,7 @@ def compile_prompt(prompt: str, seed: int = 0) -> SimulationConfig:
     return SimulationConfig(domain=domain, tick_interval_ms=tick_interval_ms, seed=seed, entities=entities)
 
 
-def _detect_domain(words: list[str]) -> Domain:
+def _detect_domain(words: list[str]) -> str:
     stems = {w.rstrip("s") for w in words} | set(words)
     for domain, keywords in DOMAIN_KEYWORDS.items():
         if stems & set(keywords):
@@ -44,45 +45,27 @@ def _detect_domain(words: list[str]) -> Domain:
 
 
 def _logistics_entities(text: str, words: list[str], count: int) -> list[EntityConfig]:
-    delay_prob = 0.05
+    delay_p = 0.05
     if {"rain", "rainy", "raining", "snow", "snowy", "storm", "stormy", "fog", "foggy"} & set(words):
-        delay_prob += 0.1
+        delay_p += 0.1
     if any(w in text for w in ("traffic", "rush hour", "congest")):
-        delay_prob += 0.1
-    route_names = list(ROUTES)
-    entities = []
-    for i in range(count):
-        route = route_names[i % len(route_names)]
-        lat, lon = ROUTES[route][0]
-        entities.append(
-            EntityConfig(
-                id=f"van-{i + 1:02d}",
-                type="delivery_vehicle",
-                initial_state={"lat": lat, "lon": lon, "battery_pct": 100.0, "status": "en_route"},
-                behavior_rules={
-                    "speed_kmh": 45,
-                    "battery_drain_rate": 0.3 if "drain" in text else 0.1,
-                    "route": route,
-                    "traffic_delay_prob": round(delay_prob, 2),
-                },
-            )
-        )
-    return entities
+        delay_p += 0.1
+    drain = 0.3 if "drain" in text else 0.1
+    routes = list(ROUTES.values())
+    return [
+        delivery_van(f"van-{i + 1:02d}", routes[i % len(routes)], delay_p=round(delay_p, 2), drain_pct_per_s=drain)
+        for i in range(count)
+    ]
 
 
 def _devops_entities(text: str, count: int) -> list[EntityConfig]:
     spiky = any(w in text for w in ("spike", "spiky", "high load", "overload"))
     return [
-        EntityConfig(
-            id=f"svc-{i + 1:02d}",
-            type="microservice",
-            initial_state={"cpu_pct": 35.0, "memory_pct": 40.0, "latency_ms": 40.0, "status": "healthy"},
-            behavior_rules={
-                "cpu_baseline": 70.0 if spiky else 35.0,
-                "volatility": 12.0 if spiky else 5.0,
-                "memory_leak_rate": 0.5 if "leak" in text else 0.0,
-                "latency_baseline_ms": 40.0,
-            },
+        microservice(
+            "svc",
+            count=count,
+            cpu_baseline=70.0 if spiky else 35.0,
+            volatility=12.0 if spiky else 5.0,
+            memory_leak_pct_per_s=0.5 if "leak" in text else 0.0,
         )
-        for i in range(count)
     ]

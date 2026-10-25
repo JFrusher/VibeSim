@@ -27,7 +27,7 @@ def test_create_control_chaos_and_websocket():
             ws.send_text(json.dumps({"name": "flat", "entity_id": event["entity_id"], "set": {"battery_pct": 0}}))
             for _ in range(10):
                 event = json.loads(ws.receive_text())
-                if event["anomalies_applied"] == ["flat"]:
+                if event["event_type"] == "telemetry_update" and event["anomalies_applied"] == ["flat"]:
                     break
             assert event["data"]["battery_pct"] == 0.0
 

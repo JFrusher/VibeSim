@@ -6,14 +6,11 @@ import random
 from typing import Literal
 
 from vibesim.chaos.injector import ChaosInjector
+from vibesim.core.entity import EntityRuntime
 from vibesim.core.state import Anomaly, SimulationConfig, SimulationState, TelemetryEvent, utcnow
-from vibesim.domains.base import DomainModel
-from vibesim.domains.devops import DevOpsDomain
-from vibesim.domains.logistics import LogisticsDomain
 
 log = logging.getLogger(__name__)
 
-DOMAINS: dict[str, type[DomainModel]] = {"logistics": LogisticsDomain, "devops": DevOpsDomain}
 SUBSCRIBER_QUEUE_SIZE = 1000
 
 # None marks end-of-stream
@@ -24,16 +21,20 @@ Status = Literal["paused", "running", "stopped", "failed"]
 class Engine:
     def __init__(self, config: SimulationConfig):
         self.config = config
-        self.domain = DOMAINS[config.domain]()
-        for e in config.entities:
-            self.domain.validate(e.id, e.initial_state, e.behavior_rules)
-        self.state = SimulationState(config)
+        # instances of the same EntityConfig share one runtime; runtimes hold no per-instance state
+        self.runtimes: dict[str, EntityRuntime] = {}
+        for entity in config.entities:
+            runtime = EntityRuntime(entity)
+            for entity_id in entity.instance_ids():
+                if entity_id in self.runtimes:
+                    raise ValueError(f"duplicate entity id '{entity_id}'")
+                self.runtimes[entity_id] = runtime
+        self.state = SimulationState({eid: rt.initial_state() for eid, rt in self.runtimes.items()})
         self.chaos = ChaosInjector(config.chaos_rules.active_anomalies)
         self.rng = random.Random(config.seed)
         # separate stream so injecting chaos doesn't shift the base trajectory
         self.chaos_rng = random.Random(config.seed + 1)
         self.status: Status = "paused"
-        self._rules = {e.id: e.behavior_rules for e in config.entities}
         self._task: asyncio.Task[None] | None = None
         self._subscribers: set[Subscriber] = set()
 
@@ -45,13 +46,28 @@ class Engine:
         dt_s = self.config.tick_interval_ms / 1000
         events = []
         for entity_id, state in self.state.entities.items():
+            runtime = self.runtimes[entity_id]
             anomalies = self.chaos.for_entity(entity_id)
             overrides = {k: v for a in anomalies for k, v in a.set.items()}
-            self.domain.apply_chaos(state, overrides)  # tick reacts to forced values
-            self.domain.tick(state, self._rules[entity_id], dt_s, self.rng)
-            self.domain.apply_chaos(state, overrides)  # payload shows forced values
+            previous_status = state.get("status")
+            state.update(overrides)  # tick reacts to forced values
+            runtime.clamp(state)
+            runtime.tick(state, tick, dt_s, self.rng)
+            state.update(overrides)  # payload shows forced values
+            runtime.clamp(state)
             if ChaosInjector.should_drop(anomalies, self.chaos_rng):
                 continue
+            if state.get("status") != previous_status:
+                events.append(
+                    TelemetryEvent(
+                        timestamp=utcnow(),
+                        tick=tick,
+                        entity_id=entity_id,
+                        event_type="state_changed",
+                        data={"field": "status", "from": previous_status, "to": state["status"]},
+                        anomalies_applied=[a.name for a in anomalies],
+                    )
+                )
             events.append(
                 TelemetryEvent(
                     timestamp=utcnow(),
