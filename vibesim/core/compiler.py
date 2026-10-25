@@ -1,11 +1,11 @@
-"""Compile a natural-language prompt into a SimulationConfig.
+"""Compile a natural-language prompt into a SimulationConfig: the offline keyword parser, or Claude.
 
-shortcut: local keyword parser, no LLM; plug an LLM in here if prompts outgrow the keyword tables.
 Runs once at creation, never per tick. Logistics prompts geocode and route here (network, cached).
 """
 
 import random
 import re
+from typing import Literal
 
 from vibesim import geo
 from vibesim.core.state import EntityConfig, SimulationConfig
@@ -33,6 +33,17 @@ PLACE = r"([A-Z][\w'.-]*(?: [A-Z][\w'.-]*)*)"
 FROM_TO = re.compile(rf"\bfrom {PLACE} to {PLACE}")
 IN_CITY = re.compile(rf"\b(?:in|around|across) (?:[a-z]+ ){{0,2}}{PLACE}")
 TICKER = re.compile(r"\b[A-Z]{2,5}\b")
+
+
+Compiler = Literal["keyword", "claude"]
+
+
+def compile_with(compiler: Compiler, prompt: str, seed: int = 0) -> SimulationConfig:
+    if compiler == "claude":
+        from vibesim.core.claude_compiler import compile_with_claude
+
+        return compile_with_claude(prompt, seed)
+    return compile_prompt(prompt, seed)
 
 
 def compile_prompt(prompt: str, seed: int = 0) -> SimulationConfig:

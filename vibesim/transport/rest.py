@@ -1,11 +1,12 @@
-"""REST control plane. Run with: uvicorn vibesim.transport.rest:app"""
+"""REST control plane. Run with: python -m vibesim"""
 
+import asyncio
 from typing import Any, Literal, Self
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, model_validator
 
-from vibesim.core.compiler import compile_prompt
+from vibesim.core.compiler import Compiler, compile_with
 from vibesim.core.engine import Engine, simulations
 from vibesim.core.state import Anomaly, SimulationConfig
 from vibesim.transport import EngineDep, sse, websocket
@@ -15,11 +16,18 @@ app.include_router(sse.router)
 app.include_router(websocket.router)
 
 
+class CompileRequest(BaseModel):
+    prompt: str
+    compiler: Compiler = "keyword"
+    seed: int = 0
+
+
 class CreateSimulation(BaseModel):
     """Exactly one of `prompt` or `config`."""
 
     prompt: str | None = None
     config: SimulationConfig | None = None
+    compiler: Compiler = "keyword"
     seed: int = 0
 
     @model_validator(mode="after")
@@ -38,10 +46,22 @@ def describe(engine: Engine) -> dict[str, Any]:
     }
 
 
+@app.post("/compile")
+async def compile_only(body: CompileRequest) -> SimulationConfig:
+    """Return the config a prompt compiles to, without running it."""
+    try:
+        return await asyncio.to_thread(compile_with, body.compiler, body.prompt, body.seed)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+
+
 @app.post("/simulations", status_code=201)
 async def create_simulation(body: CreateSimulation) -> dict[str, Any]:
     try:
-        config = body.config if body.config is not None else compile_prompt(str(body.prompt), seed=body.seed)
+        # compiling may call OSRM or Claude; a thread keeps other simulations ticking meanwhile
+        config = body.config
+        if config is None:
+            config = await asyncio.to_thread(compile_with, body.compiler, str(body.prompt), body.seed)
         engine = Engine(config)
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
