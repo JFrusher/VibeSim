@@ -8,13 +8,6 @@ from typing import Any
 from vibesim.core.state import Drift, EntityConfig, PluginRef, Transition
 from vibesim.domains.base import Plugin, clamp
 
-# (start, destination) as (lat, lon)
-ROUTES: dict[str, list[tuple[float, float]]] = {
-    "southampton_to_winchester": [(50.9097, -1.4043), (51.0632, -1.3080)],
-    "southampton_to_portsmouth": [(50.9097, -1.4043), (50.8198, -1.0880)],
-    "winchester_to_basingstoke": [(51.0632, -1.3080), (51.2665, -1.0924)],
-}
-
 EARTH_KM_PER_DEG_LAT = 111.32
 MOVING = ("en_route", "delayed")
 
@@ -73,13 +66,18 @@ class VehiclePlugin(Plugin):
 
 
 def delivery_van(
-    id: str, path: list[tuple[float, float]], *, delay_p: float = 0.05, drain_pct_per_s: float = 0.1
+    id: str,
+    path: list[tuple[float, float]],
+    *,
+    speed_kmh: float = 45.0,
+    delay_p: float = 0.05,
+    drain_pct_per_s: float = 0.1,
 ) -> EntityConfig:
     return EntityConfig(
         id=id,
         type="delivery_vehicle",
         initial_state={"battery_pct": 100.0, "status": "en_route"},
-        plugin=PluginRef(name="vehicle", params={"path": [list(p) for p in path], "speed_kmh": 45}),
+        plugin=PluginRef(name="vehicle", params={"path": [list(p) for p in path], "speed_kmh": speed_kmh}),
         fields={
             "battery_pct": Drift(
                 behavior="drift",
