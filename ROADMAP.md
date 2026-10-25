@@ -20,7 +20,7 @@ Done first because the package rename breaks every import, and CI makes every la
 
 **Done when:** CI is green, mypy strict passes, and the package imports as `vibesim`.
 
-## Phase 2: Hybrid domain engine
+## Phase 2: Hybrid domain engine ✅
 The core of "simulate anything".
 - **Declarative fields.** Each entity field has a behaviour: `constant`, `drift` (linear), `random_walk`, `mean_revert`, `cycle` (daily/sine), `derived` (a safe expression over other fields, e.g. latency from cpu), plus `min`/`max` clamps.
 - **State machines.** States with per-tick transition probabilities and guard conditions (e.g. `en_route → delayed p=0.05`, `→ out_of_battery when battery_pct == 0`).
