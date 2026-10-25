@@ -136,14 +136,27 @@ class ChaosRules(BaseModel):
     random: RandomChaos | None = None
 
 
+class Persistence(BaseModel):
+    """Opt-in: periodic snapshots (resumed after a restart) and a JSONL recording of every event."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    snapshot_every_ticks: int | None = Field(None, ge=1)
+    record: bool = False
+
+
 class SimulationConfig(BaseModel):
     schema_version: Literal[1] = 1
-    simulation_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    # used in file names for snapshots and recordings, so restricted to a safe alphabet
+    simulation_id: str = Field(default_factory=lambda: str(uuid.uuid4()), pattern=r"^[A-Za-z0-9_-]{1,64}$")
     domain: str  # free-text label, e.g. "logistics"
     tick_interval_ms: int = Field(1000, ge=100)
+    time_scale: float = Field(1.0, gt=0.0)  # simulated seconds per wall-clock second
+    start_time: datetime | None = None  # simulated clock origin; set to the creation time when omitted
     seed: int = 0
     entities: list[EntityConfig] = Field(min_length=1)
     chaos_rules: ChaosRules = ChaosRules()
+    persistence: Persistence = Persistence()
 
 
 class TelemetryEvent(BaseModel):

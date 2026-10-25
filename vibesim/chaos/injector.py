@@ -95,6 +95,27 @@ class ChaosInjector:
     def delay(anomalies: list[Anomaly], rng: random.Random) -> int:
         return max((a.delay_ticks + rng.randint(0, a.jitter_ticks) for a in anomalies), default=0)
 
+    def snapshot(self) -> dict[str, Any]:
+        return {
+            "random_count": self._random_count,
+            "active": [
+                {
+                    "anomaly": a.anomaly.model_dump(mode="json"),
+                    "injected_at": a.injected_at,
+                    "ramp_from": [[eid, key, value] for (eid, key), value in a.ramp_from.items()],
+                }
+                for a in self._active.values()
+            ],
+        }
+
+    def restore(self, snapshot: dict[str, Any]) -> None:
+        self._random_count = snapshot["random_count"]
+        self._active = {}
+        for item in snapshot["active"]:
+            anomaly = Anomaly.model_validate(item["anomaly"])
+            ramp_from = {(eid, key): value for eid, key, value in item["ramp_from"]}
+            self._active[anomaly.name] = _Active(anomaly, item["injected_at"], ramp_from)
+
     def _check_targets(self, anomaly: Anomaly) -> None:
         if anomaly.targets is not None and (unknown := set(anomaly.targets) - self.entity_ids):
             raise ValueError(f"anomaly '{anomaly.name}' targets unknown entities {sorted(unknown)}")
