@@ -39,7 +39,7 @@ The core of "simulate anything".
 
 **Done when:** each domain has a preset scenario and tests, and the logistics demo is realistic on a real map.
 
-## Phase 4: Compiler (keyword + optional Claude)
+## Phase 4: Compiler (keyword + optional Claude) ✅
 - The keyword compiler covers all five domains plus common modifiers (counts, weather, load, failure rates, tick rate).
 - **Claude compiler:** the Anthropic SDK with structured output targeting the `SimulationConfig` JSON schema. Output is validated by the same Pydantic models and rejected with a clear error if invalid. It is called once per creation and never per tick.
 - Selection: `compiler: keyword | claude` in the request or scenario. `claude` requires `ANTHROPIC_API_KEY` and fails fast without it, with no silent fallback.
