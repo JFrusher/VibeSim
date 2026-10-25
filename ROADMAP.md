@@ -75,7 +75,7 @@ Each one is opt-in per simulation or server.
 
 **Done when:** each integration has an end-to-end test against a real client or broker in CI (e.g. a Mosquitto service container).
 
-## Phase 8: CLI and web console
+## Phase 8: CLI and web console ✅
 - **CLI:** `vibesim run "5 vans in rainy Southampton"`, `vibesim run scenario.yaml`, `vibesim compile "..."`, `vibesim replay run.jsonl`. It starts the server and prints the stream and console URLs.
 - **Console:** one static page served by FastAPI, using Leaflet and a chart library from CDN with no build step. It lets you create a simulation from a prompt or file, see vans on a live map and services on live charts, start, pause, step and fast-forward, inject chaos with buttons or plain English, and export the scenario.
 

@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VibeSim Console</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js" integrity="sha384-+pxiN6T7yvpryuJmE1gM9PX7yQit15auDb+ZwwvJOd/4be2Cie5/IuVXgQb/S9du" crossorigin="anonymous"></script>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --ink: #16181d; --muted: #6b7280; --line: #e3e6eb;
+    --accent: #3b5bdb; --ok: #2f9e44; --warn: #e8a400; --bad: #e03131; --info: #1c7ed6;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1115; --panel: #171a21; --ink: #e8eaee; --muted: #8b93a1; --line: #262b35; --accent: #748ffc; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 system-ui, sans-serif; background: var(--bg); color: var(--ink); }
+  header { display: flex; align-items: baseline; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  header h1 { margin: 0; font-size: 17px; letter-spacing: .3px; }
+  header span { color: var(--muted); font-size: 13px; }
+  .layout { display: grid; grid-template-columns: 300px 1fr; min-height: calc(100vh - 50px); }
+  aside { border-right: 1px solid var(--line); padding: 16px; background: var(--panel); display: flex; flex-direction: column; gap: 18px; }
+  main { padding: 16px 20px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; }
+  textarea, input, select, button { font: inherit; color: inherit; }
+  textarea, input[type=text], input[type=number], select {
+    width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg);
+  }
+  textarea { resize: vertical; min-height: 64px; }
+  button { padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .row > * { flex: 0 0 auto; }
+  .grow { flex: 1 1 auto !important; min-width: 0; width: auto !important; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .sims { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .sims li { padding: 8px 10px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; }
+  .sims li:hover { border-color: var(--line); }
+  .sims li.active { border-color: var(--accent); }
+  .sims small { color: var(--muted); display: block; font-family: var(--mono); font-size: 11px; }
+  .chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; color: #fff; background: var(--info); }
+  .chip.ok { background: var(--ok); } .chip.warn { background: var(--warn); } .chip.bad { background: var(--bad); }
+  #map { height: 380px; border-radius: 10px; border: 1px solid var(--line); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; }
+  td .val { font-family: var(--mono); display: inline-block; min-width: 64px; }
+  svg.spark { vertical-align: middle; }
+  .scroll { overflow-x: auto; }
+  .log { font-family: var(--mono); font-size: 12px; max-height: 180px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+  .log li { padding: 2px 0; color: var(--muted); }
+  .log b { color: var(--ink); font-weight: 500; }
+  .anomaly { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-family: var(--mono); font-size: 12px; }
+  .empty { color: var(--muted); padding: 40px; text-align: center; }
+  .error { color: var(--bad); font-size: 13px; min-height: 1em; }
+  @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } aside { border-right: 0; border-bottom: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+<header><h1>VibeSim</h1><span>living telemetry for apps under construction</span></header>
+<div class="layout">
+  <aside>
+    <section>
+      <h2>New simulation</h2>
+      <textarea id="prompt" placeholder="5 delivery vans in rainy Bristol">5 delivery vans in rainy Bristol</textarea>
+      <div class="row" style="margin-top:8px">
+        <select id="compiler" class="grow" aria-label="compiler">
+          <option value="keyword">keyword compiler</option>
+          <option value="claude">Claude compiler</option>
+        </select>
+        <input id="seed" type="number" value="0" style="width:70px" aria-label="seed">
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="primary" id="create">Create</button>
+        <label class="grow"><input id="file" type="file" accept=".yaml,.yml,.json" hidden>
+          <button type="button" onclick="document.getElementById('file').click()">Load scenario…</button></label>
+      </div>
+      <div class="error" id="create-error"></div>
+    </section>
+    <section>
+      <h2>Simulations</h2>
+      <ul class="sims" id="sims"></ul>
+    </section>
+  </aside>
+  <main id="main"><div class="empty">Create a simulation or pick one on the left.</div></main>
+</div>
+
+<template id="sim-view">
+  <div class="card">
+    <div class="row">
+      <strong id="title" class="grow"></strong>
+      <span class="chip" id="status"></span>
+      <span id="tick" style="font-family:var(--mono);color:var(--muted)"></span>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button data-action="start">Start</button>
+      <button data-action="pause">Pause</button>
+      <button data-action="step">Step</button>
+      <button data-action="stop">Stop</button>
+      <input id="ticks" type="number" value="600" min="1" style="width:90px" aria-label="ticks to advance">
+      <button id="advance">Fast-forward</button>
+      <span class="grow"></span>
+      <a id="export" download>Export scenario</a>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Chaos</h2>
+    <div class="row">
+      <input id="chaos" type="text" class="grow" placeholder="sudden network drop on half the vans for 30 seconds">
+      <button class="primary" id="inject">Inject</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button data-quick="total outage for 10 seconds">Outage</button>
+      <button data-quick="30% packet loss for 30 seconds">Packet loss</button>
+      <button data-quick="laggy network with jitter for 20 seconds">Latency + jitter</button>
+    </div>
+    <div class="error" id="chaos-error"></div>
+    <div id="anomalies"></div>
+  </div>
+  <div id="map" hidden></div>
+  <div class="card scroll"><table id="table"></table></div>
+  <div class="card"><h2>State changes</h2><ul class="log" id="log"></ul></div>
+</template>
+
+<script>
+"use strict";
+const HISTORY = 60;
+const $ = (id) => document.getElementById(id);
+const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+let current = null;  // { id, source, latest, history, markers, map, dirty }
+
+async function api(path, options = {}) {
+  const response = await fetch(path, { headers: { "content-type": "application/json" }, ...options });
+  if (!response.ok) throw new Error((await response.json().catch(() => ({}))).detail || response.statusText);
+  return response.status === 204 ? null : response.json();
+}
+const post = (path, body = {}) => api(path, { method: "POST", body: JSON.stringify(body) });
+
+function tone(status) {
+  const s = String(status);
+  if (/fail|out_of|down|restart|crash|broken/.test(s)) return "bad";
+  if (/degrad|delay|low|warn|cool|heat/.test(s)) return "warn";
+  if (/healthy|en_route|in_stock|idle|ok|arrived|running/.test(s)) return "ok";
+  return "";
+}
+
+function spark(values) {
+  if (values.length < 2) return "";
+  const min = Math.min(...values), max = Math.max(...values), span = max - min || 1;
+  const points = values.map((v, i) => `${(i / (values.length - 1)) * 100},${22 - ((v - min) / span) * 20}`).join(" ");
+  return `<svg class="spark" width="100" height="24" viewBox="0 0 100 24"><polyline fill="none" stroke="var(--accent)" stroke-width="1.5" points="${points}"/></svg>`;
+}
+
+async function refreshList() {
+  const sims = await api("/simulations");
+  $("sims").innerHTML = sims.map((s) => `
+    <li data-id="${esc(s.simulation_id)}" class="${current && current.id === s.simulation_id ? "active" : ""}">
+      ${esc(s.domain)} <span class="chip ${tone(s.status)}">${esc(s.status)}</span>
+      <small>${esc(s.simulation_id)} · tick ${s.tick}</small>
+    </li>`).join("") || `<li style="color:var(--muted);cursor:default">none yet</li>`;
+}
+
+async function create(body) {
+  $("create-error").textContent = "";
+  try {
+    const sim = await post("/simulations", body);
+    await refreshList();
+    select(sim.simulation_id);
+  } catch (e) { $("create-error").textContent = e.message; }
+}
+
+async function select(id) {
+  if (current) { current.source.close(); if (current.map) current.map.remove(); }
+  history.replaceState(null, "", `?sim=${encodeURIComponent(id)}`);
+  $("main").replaceChildren($("sim-view").content.cloneNode(true));
+  current = { id, latest: {}, history: {}, markers: {}, map: null, dirty: true };
+  wire(id);
+  const scenario = await api(`/simulations/${id}/scenario?format=json`).catch(() => null);
+  const state = await api(`/simulations/${id}/state`);
+  $("title").textContent = scenario ? `${scenario.domain} · ${id}` : id;
+  Object.entries(state.entities).forEach(([eid, data]) => (current.latest[eid] = data));
+  setupMap(scenario);
+  current.source = new EventSource(`/simulations/${id}/stream`);
+  current.source.onmessage = (message) => onEvent(JSON.parse(message.data));
+  renderMeta(state);
+  refreshList();
+}
+
+function wire(id) {
+  document.querySelectorAll("[data-action]").forEach((b) => (b.onclick = () =>
+    post(`/simulations/${id}/${b.dataset.action}`).then(renderMeta).catch((e) => alert(e.message))));
+  $("advance").onclick = () => post(`/simulations/${id}/advance?ticks=${$("ticks").value}`).then(renderMeta).catch((e) => alert(e.message));
+  $("export").href = `/simulations/${id}/scenario?format=yaml`;
+  $("export").setAttribute("download", `${id}.yaml`);
+  const inject = (prompt) => {
+    $("chaos-error").textContent = "";
+    post(`/simulations/${id}/chaos/prompt`, { prompt, compiler: $("compiler").value })
+      .then(renderMeta).catch((e) => ($("chaos-error").textContent = e.message));
+  };
+  $("inject").onclick = () => inject($("chaos").value);
+  $("chaos").onkeydown = (e) => e.key === "Enter" && inject($("chaos").value);
+  document.querySelectorAll("[data-quick]").forEach((b) => (b.onclick = () => inject(b.dataset.quick)));
+}
+
+function setupMap(scenario) {
+  const geo = Object.values(current.latest).some((d) => typeof d.lat === "number" && typeof d.lon === "number");
+  if (!geo || typeof L === "undefined") return;
+  $("map").hidden = false;
+  current.map = L.map("map");
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(current.map);
+  const bounds = [];
+  for (const entity of scenario ? scenario.entities : []) {
+    const path = entity.plugin && entity.plugin.params && entity.plugin.params.path;
+    if (path) { L.polyline(path, { color: "#748ffc", weight: 3, opacity: 0.5 }).addTo(current.map); bounds.push(...path); }
+  }
+  Object.values(current.latest).forEach((d) => bounds.push([d.lat, d.lon]));
+  current.map.fitBounds(bounds, { padding: [20, 20] });
+}
+
+function onEvent(event) {
+  if (event.event_type === "state_changed") {
+    const item = document.createElement("li");
+    item.innerHTML = `tick ${event.tick} <b>${esc(event.entity_id)}</b> ${esc(event.data.from)} → <b>${esc(event.data.to)}</b>`;
+    $("log").prepend(item);
+    return;
+  }
+  current.latest[event.entity_id] = event.data;
+  const history = (current.history[event.entity_id] ||= {});
+  for (const [field, value] of Object.entries(event.data)) {
+    if (typeof value !== "number") continue;
+    (history[field] ||= []).push(value);
+    if (history[field].length > HISTORY) history[field].shift();
+  }
+  current.tick = Math.max(current.tick || 0, event.tick);
+  current.dirty = true;
+}
+
+function render() {
+  if (current && current.dirty && $("table")) {
+    current.dirty = false;
+    const rows = Object.entries(current.latest);
+    const fields = [...new Set(rows.flatMap(([, d]) => Object.keys(d)))]
+      .filter((f) => f !== "status" && !Array.isArray(rows[0][1][f]));
+    $("table").innerHTML = `<tr><th>entity</th><th>status</th>${fields.map((f) => `<th>${esc(f)}</th>`).join("")}</tr>` +
+      rows.map(([eid, d]) => `<tr><td><b>${esc(eid)}</b></td>
+        <td>${d.status !== undefined ? `<span class="chip ${tone(d.status)}">${esc(d.status)}</span>` : ""}</td>
+        ${fields.map((f) => {
+          const v = d[f];
+          const shown = typeof v === "number" ? +v.toFixed(3) : v === undefined ? "" : v;
+          return `<td><span class="val">${esc(shown)}</span>${typeof v === "number" ? spark(((current.history[eid] || {})[f]) || []) : ""}</td>`;
+        }).join("")}</tr>`).join("");
+    if (current.tick) $("tick").textContent = `tick ${current.tick}`;
+    if (current.map) {
+      for (const [eid, d] of rows) {
+        const color = { ok: "#2f9e44", warn: "#e8a400", bad: "#e03131" }[tone(d.status)] || "#1c7ed6";
+        const marker = (current.markers[eid] ||= L.circleMarker([d.lat, d.lon], { radius: 7, weight: 2 }).addTo(current.map).bindTooltip(eid));
+        marker.setLatLng([d.lat, d.lon]).setStyle({ color, fillColor: color, fillOpacity: 0.8 });
+      }
+    }
+  }
+  requestAnimationFrame(render);
+}
+
+function renderMeta(state) {
+  if (!$("status")) return;
+  $("status").textContent = state.status;
+  $("status").className = `chip ${tone(state.status)}`;
+  $("tick").textContent = `tick ${state.tick}`;
+  $("anomalies").innerHTML = state.active_anomalies.map((a) => `
+    <div class="anomaly"><span>${esc(a.name)}${a.targets ? ` → ${esc(a.targets.join(", "))}` : " → all"}</span>
+    <button data-remove="${esc(a.name)}">remove</button></div>`).join("");
+  document.querySelectorAll("[data-remove]").forEach((b) => (b.onclick = () =>
+    api(`/simulations/${current.id}/chaos/${encodeURIComponent(b.dataset.remove)}`, { method: "DELETE" }).then(renderMeta)));
+}
+
+$("create").onclick = () => create({ prompt: $("prompt").value, compiler: $("compiler").value, seed: +$("seed").value });
+$("file").onchange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const text = await file.text();
+  try {
+    create({ config: file.name.endsWith(".json") ? JSON.parse(text) : jsyaml.load(text) });
+  } catch (err) { $("create-error").textContent = `${file.name}: ${err.message}`; }
+  e.target.value = "";
+};
+$("sims").onclick = (e) => { const li = e.target.closest("li[data-id]"); if (li) select(li.dataset.id); };
+setInterval(() => { refreshList(); if (current) api(`/simulations/${current.id}/state`).then(renderMeta).catch(() => {}); }, 2000);
+refreshList();
+const initial = new URLSearchParams(location.search).get("sim");
+if (initial) select(initial);
+requestAnimationFrame(render);
+</script>
+</body>
+</html>

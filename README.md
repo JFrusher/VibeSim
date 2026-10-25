@@ -2,12 +2,32 @@
 
 Local-first, promptable micro-emulator. Describe a world in one sentence, get a stateful simulation streaming live telemetry over SSE or WebSocket. No LLM or network calls at runtime: the prompt is compiled once by a local keyword parser, then ticks run in-process.
 
-## Run
+## Quickstart
 
 ```bash
-pip install -e ".[dev]"
-python -m vibesim            # http://127.0.0.1:8000, add --host 0.0.0.0 to expose
+pip install vibesim
+vibesim run "5 delivery vans in rainy Bristol"
 ```
+
+```
+  simulation  0867f0da-… (logistics, 5 entities)
+  console     http://127.0.0.1:8000/?sim=0867f0da-…
+  stream      http://127.0.0.1:8000/simulations/0867f0da-…/stream
+  websocket   ws://127.0.0.1:8000/simulations/0867f0da-…/ws
+```
+
+Open the console to watch the vans move on a live map, inject chaos with buttons or plain English, fast-forward, and export the scenario. Point your app at the stream URL.
+
+| Command | |
+|---|---|
+| `vibesim run "<prompt>"` / `vibesim run scenario.yaml` | serve with a simulation (`--compiler claude`, `--seed`, `--host`, `--port`) |
+| `vibesim compile "<prompt>" > scenario.yaml` | write a scenario to edit and re-run |
+| `vibesim replay <recording-id> --speed 10` | replay a recorded run |
+| `vibesim serve` (or `python -m vibesim`) | the server and console with no simulation |
+
+The server listens on 127.0.0.1 only. Pass `--host 0.0.0.0` to expose it.
+
+## Run over HTTP
 
 ```bash
 # create (starts ticking immediately)

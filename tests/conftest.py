@@ -12,4 +12,13 @@ def offline(monkeypatch, tmp_path):
     def no_network(*args, **kwargs):
         raise AssertionError("tests must not hit the network")
 
-    monkeypatch.setattr(urllib.request, "urlopen", no_network)
+    # localhost stays reachable for end-to-end tests against a real server
+    real_urlopen = urllib.request.urlopen
+
+    def guarded(url, *args, **kwargs):
+        target = url if isinstance(url, str) else url.full_url
+        if target.startswith(("http://127.0.0.1", "http://localhost")):
+            return real_urlopen(url, *args, **kwargs)
+        return no_network()
+
+    monkeypatch.setattr(urllib.request, "urlopen", guarded)

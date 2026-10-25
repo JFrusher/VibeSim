@@ -29,6 +29,9 @@ dev = [
 requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
+[project.scripts]
+vibesim = "vibesim.cli:main"
+
 [project.entry-points.pytest11]
 vibesim = "vibesim.testing"
 
