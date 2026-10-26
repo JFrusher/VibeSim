@@ -3,6 +3,7 @@ name: Docs
 on:
   push:
     branches: [main]
+  workflow_dispatch:  # "Run workflow" button; re-running an old run duplicates its artifact
 
 permissions:
   contents: read
